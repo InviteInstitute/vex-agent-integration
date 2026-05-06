@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     allowedHosts: [
-      'localhost', 'ec2-98-82-30-138.compute-1.amazonaws.com'
+      'localhost', 'ec2-98-82-30-138.compute-1.amazonaws.com', 'd1mwo64z1sb7qg.cloudfront.net'
     ]
   },
 });
