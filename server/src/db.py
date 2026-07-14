@@ -2,6 +2,7 @@ import os
 from uuid import UUID
 
 import psycopg
+from psycopg.types.json import Json
 from dotenv import load_dotenv
 
 
@@ -11,6 +12,50 @@ def get_conn() -> psycopg.Connection:
     if not database_url:
         raise RuntimeError("DATABASE_URL is not set")
     return psycopg.connect(database_url)
+
+
+def insert_agent_trigger_if_new(
+    *,
+    student_id: str,
+    session_id: str,
+    trigger_type: str,
+    run_index: int,
+    detail: dict | None = None,
+) -> int | None:
+    """Insert a detected trigger, deduped on (student, session, type, run_index).
+    Returns the new row id, or None when the trigger already existed. Detection is
+    deterministic, so re-running a pass over the same events never double-fires."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO event_logs.agent_triggers (
+                    student_id, session_id, trigger_type, run_index, detail_json
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (student_id, session_id, trigger_type, run_index)
+                DO NOTHING
+                RETURNING id
+                """,
+                (student_id, session_id, trigger_type, run_index,
+                 Json(detail) if detail is not None else None),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+
+
+def mark_agent_trigger_acted(*, trigger_id: int, response_id: UUID) -> None:
+    """Record that the agent acted on a trigger and which proactive response it produced."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE event_logs.agent_triggers
+                SET acted = TRUE, response_id = %s
+                WHERE id = %s
+                """,
+                (response_id, trigger_id),
+            )
 
 
 def insert_message(
