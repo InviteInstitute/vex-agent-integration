@@ -30,7 +30,7 @@ TRIGGER_TO_FEEDBACK_CLASS = {
     "explorer": {FeedbackClass.DIAGNOSE},
     "inactive": {FeedbackClass.REASSURE, FeedbackClass.QUESTION},
 }
-ACTED_TRIGGERS = {"wheel_spin", "resilience", "inactive"}
+ACTED_TRIGGERS = {"wheel_spin", "resilience", "inactive", "explorer", "iterative"}
 
 # inactive is sustained (time-based, not edit-distance), so it isn't produced by the
 # per-run detector. It fires once per session (a fixed run_index sentinel deduplicates
