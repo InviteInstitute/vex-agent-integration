@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from src.current_state_metrics import EventRecord, fetch_events_from_db
 from src.triggers.run_sequence import compute_run_edit_distances
+from src.triggers.detectors import detect_run_triggers_by_playground
+from src.db import insert_agent_trigger_if_new
 
 
 def _event_record_to_engine_dict(event: EventRecord) -> dict:
@@ -35,3 +37,33 @@ def compute_run_distances_for_session(student_id: str, session_id: str) -> list[
     """Fetch a session's events from the DB and compute the per-run distance sequence."""
     events = fetch_events_from_db(student_id=student_id, session_id=session_id)
     return compute_run_distances(events)
+
+
+def detect_triggers_for_session(student_id: str, session_id: str) -> list[tuple]:
+    """Detect all momentary triggers for a session: (trigger_type, run_index, detail)."""
+    runs = compute_run_distances_for_session(student_id, session_id)
+    return detect_run_triggers_by_playground(runs)
+
+
+def persist_new_triggers(student_id: str, session_id: str) -> list[dict]:
+    """Detect triggers for the session and persist the ones not seen before (deduped
+    on student/session/type/run_index). Returns only the newly-inserted rows, so the
+    caller can act on genuinely-new fires. Detection covers all five trigger types;
+    which ones get ACTED on is the caller's policy (v1: wheel_spin only)."""
+    new_rows = []
+    for trigger_type, run_index, detail in detect_triggers_for_session(student_id, session_id):
+        trigger_id = insert_agent_trigger_if_new(
+            student_id=student_id,
+            session_id=session_id,
+            trigger_type=trigger_type,
+            run_index=run_index,
+            detail=detail,
+        )
+        if trigger_id is not None:
+            new_rows.append({
+                "id": trigger_id,
+                "trigger_type": trigger_type,
+                "run_index": run_index,
+                "detail": detail,
+            })
+    return new_rows
