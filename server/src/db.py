@@ -66,6 +66,7 @@ def insert_message(
     message_text: str,
     feedback_class: str | None = None,
     response_id: UUID | None = None,
+    origin: str = "reactive",
 ) -> None:
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -77,9 +78,10 @@ def insert_message(
                     role,
                     message_text,
                     feedback_class,
-                    response_id
+                    response_id,
+                    origin
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     session_id,
@@ -88,6 +90,7 @@ def insert_message(
                     message_text,
                     feedback_class,
                     response_id,
+                    origin,
                 ),
             )
 

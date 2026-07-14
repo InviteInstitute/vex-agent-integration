@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from src.routes.students import router as students_router
+from src.routes.admin import router as admin_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +39,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(students_router)
+app.include_router(admin_router)
 
 
 @app.get("/health")
