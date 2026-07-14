@@ -1,5 +1,6 @@
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,7 @@ from dotenv import load_dotenv
 from src.routes.students import router as students_router
 from src.routes.admin import router as admin_router
 from src.routes.stream import router as stream_router
+from src.trigger_daemon import start_daemon, stop_daemon
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,7 +33,15 @@ def get_allowed_origins() -> list[str]:
     ]
 
 
-app = FastAPI(title="Pedagogical AI Agent API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start the proactive trigger daemon (no-op unless TRIGGER_DAEMON_ENABLED).
+    start_daemon()
+    yield
+    stop_daemon()
+
+
+app = FastAPI(title="Pedagogical AI Agent API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_origins(),
