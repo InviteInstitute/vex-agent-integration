@@ -70,6 +70,7 @@ Use local Postgres per team member, and apply the same migration files.
    - `psql "$DATABASE_URL" -f server/db/migrations/003_add_playground_data_to_parsed_events.sql`
    - `psql "$DATABASE_URL" -f server/db/migrations/004_create_messages.sql`
    - `psql "$DATABASE_URL" -f server/db/migrations/005_create_message_feedback.sql`
+   - `psql "$DATABASE_URL" -f server/db/migrations/006_create_agent_triggers.sql`
 5. Load parsed logs:
    - `python3 server/src/parse_event_logs.py --input server/tests/fixtures/raw_logs/01_error_flagging_a.ndjson --insert`
 
