@@ -3,6 +3,7 @@ trigger engine (server/src/triggers/). The engine stays framework/DB-free; this
 module does the adapting so the coupling points one way (app -> engine)."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from src.current_state_metrics import (
@@ -10,6 +11,7 @@ from src.current_state_metrics import (
 )
 from src.triggers.run_sequence import compute_run_edit_distances
 from src.triggers.detectors import detect_run_triggers_by_playground
+from src.triggers.constants import INACTIVE_TRIGGER_SECONDS, TRIGGER_LABELS
 from src.db import insert_agent_trigger_if_new, insert_message, mark_agent_trigger_acted
 from src.feedback_policy import FeedbackClass
 from src.task_catalog import resolve_task_description
@@ -28,7 +30,12 @@ TRIGGER_TO_FEEDBACK_CLASS = {
     "explorer": {FeedbackClass.DIAGNOSE},
     "inactive": {FeedbackClass.REASSURE, FeedbackClass.QUESTION},
 }
-ACTED_TRIGGERS = {"wheel_spin"}
+ACTED_TRIGGERS = {"wheel_spin", "resilience", "inactive"}
+
+# inactive is sustained (time-based, not edit-distance), so it isn't produced by the
+# per-run detector. It fires once per session (a fixed run_index sentinel deduplicates
+# it) when the last event is older than the idle threshold.
+INACTIVE_RUN_INDEX = -1
 
 # The trigger fed to the LLM as a NEUTRAL behavioral fact -- never the internal
 # label ("Wheel-spinning"), which the spike showed leaking into student-facing text.
@@ -72,18 +79,46 @@ def compute_run_distances_for_session(student_id: str, session_id: str) -> list[
 
 
 def detect_triggers_for_session(student_id: str, session_id: str) -> list[tuple]:
-    """Detect all momentary triggers for a session: (trigger_type, run_index, detail)."""
+    """Detect all momentary (edit-distance) triggers for a session:
+    (trigger_type, run_index, detail)."""
     runs = compute_run_distances_for_session(student_id, session_id)
     return detect_run_triggers_by_playground(runs)
+
+
+def is_inactive(last_event_ts: datetime | None, now: datetime) -> bool:
+    """True if the last event is older than the idle threshold."""
+    if last_event_ts is None:
+        return False
+    return (now - last_event_ts).total_seconds() >= INACTIVE_TRIGGER_SECONDS
+
+
+def detect_inactive_trigger(student_id: str, session_id: str, now: datetime | None = None):
+    """The sustained inactive trigger: fires once per session (INACTIVE_RUN_INDEX
+    sentinel dedupes it) when the session has gone idle. Returns a fire tuple or None."""
+    events = fetch_events_from_db(student_id=student_id, session_id=session_id)
+    if not events:
+        return None
+    now = now or datetime.now(timezone.utc)
+    last_ts = events[-1].event_ts  # events are ascending by event_ts
+    if not is_inactive(last_ts, now):
+        return None
+    idle_minutes = int((now - last_ts).total_seconds() // 60)
+    return ("inactive", INACTIVE_RUN_INDEX,
+            {"label": TRIGGER_LABELS["inactive"], "value": f"idle {idle_minutes}m"})
 
 
 def persist_new_triggers(student_id: str, session_id: str) -> list[dict]:
     """Detect triggers for the session and persist the ones not seen before (deduped
     on student/session/type/run_index). Returns only the newly-inserted rows, so the
-    caller can act on genuinely-new fires. Detection covers all five trigger types;
-    which ones get ACTED on is the caller's policy (v1: wheel_spin only)."""
+    caller can act on genuinely-new fires. Detection covers all trigger types; which
+    ones get ACTED on is the caller's policy (ACTED_TRIGGERS)."""
+    fires = list(detect_triggers_for_session(student_id, session_id))
+    inactive_fire = detect_inactive_trigger(student_id, session_id)
+    if inactive_fire is not None:
+        fires.append(inactive_fire)
+
     new_rows = []
-    for trigger_type, run_index, detail in detect_triggers_for_session(student_id, session_id):
+    for trigger_type, run_index, detail in fires:
         trigger_id = insert_agent_trigger_if_new(
             student_id=student_id,
             session_id=session_id,
