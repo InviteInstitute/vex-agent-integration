@@ -13,10 +13,10 @@ def test_wheel_spin_maps_to_reassure_diagnose():
     }
 
 
-def test_non_acted_trigger_returns_none_without_side_effects():
-    # explorer is seeded but not acted on in v1 -> returns None before any DB/LLM call
-    assert "explorer" not in ACTED_TRIGGERS
-    assert generate_proactive_response("stu", "sess", "explorer") is None
+def test_unknown_trigger_returns_none_without_side_effects():
+    # an unrecognized trigger type is never acted on -> returns None before any DB/LLM call
+    assert "totally_unknown" not in ACTED_TRIGGERS
+    assert generate_proactive_response("stu", "sess", "totally_unknown") is None
 
 
 def test_neutral_facts_never_leak_internal_labels():

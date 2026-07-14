@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-14
 **Repo:** InviteInstitute/vex-agent-integration (fork of VEX-pedagogical-policies-project)
-**Status:** Design approved; spike validated; ready for slice-by-slice implementation.
+**Status:** Delivered — all slices implemented and merged (2026-07-14). See §14.
 
 ## 1. Goal
 
@@ -156,5 +156,25 @@ Each slice is demoable end-to-end, riskiest-first:
 
 ## 13. Deferred (tracked, not v1)
 - Suppress-while-actively-chatting.
-- Acting on explorer/iterative (slice 5).
 - In-process pub/sub for SSE at scale.
+- Sanitizer robustness for model meta-preambles (issue #22).
+
+## 14. Delivered (2026-07-14)
+
+All slices merged to `main`. Every non-trivial change landed with tests; the full
+suite is **54 passing**.
+
+| Slice | PRs | What shipped |
+|---|---|---|
+| Foundation | #1, #16 | Spec + spike; vendored trigger engine (`server/src/triggers/`, APTED). |
+| 1 | #17, #18, #19, #20, #21, #23 | Migration 006; EventRecord→distance adapter; detect+dedupe-persist; output sanitizer; wheel_spin generation (grounded, no label leak); `POST /admin/tick`. |
+| 2 | #24, #25 | SSE endpoint (DB-poll backed); client `EventSource`. |
+| 3 | #26 | Always-on daemon (lifespan thread) + fail-closed allowlist scoping + per-student cooldown. |
+| 4 | #27 | Graduated `resilience` + `inactive` (sustained/time-based). |
+| 5 | #28 | Graduated `explorer` + `iterative`. All five triggers now act. |
+
+**Follow-ups (open):** #22 (sanitizer meta-preamble robustness; also see the §9.3 note
+on a stronger production model).
+
+**Enabling in production:** set `TRIGGER_DAEMON_ENABLED=true` and scope with
+`PROACTIVE_STUDENT_ALLOWLIST` or `PROACTIVE_CLASS_CODE` (empty = acts on nobody).
