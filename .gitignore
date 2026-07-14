@@ -23,8 +23,9 @@ client/.vite/
 dist/
 build/
 
-# Logs
+# Logs / local run state
 *.log
+.run/
 
 # Local fetched Invite Hub artifacts
 server/src/invite_hub_sync_state*.json
