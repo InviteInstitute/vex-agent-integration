@@ -2,5 +2,6 @@ fastapi==0.116.1
 openai==1.108.1
 psycopg[binary]==3.2.10
 python-dotenv==1.1.1
+apted>=1.0                # per-run code-diff signal: APTED tree-edit distance (trigger engine)
 uvicorn==0.35.0
 pytest==8.4.2
