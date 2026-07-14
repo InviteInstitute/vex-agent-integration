@@ -10,6 +10,7 @@ from src.context_builder import (
     build_robot_behavior_prompt,
 )
 from src.feedback_policy import FeedbackClass
+from src.output_sanitizer import sanitize_llm_output
 from src.settings import get_navigator_model
 
 DEFAULT_LLM_TIMEOUT_S = 30.0
@@ -140,7 +141,7 @@ def generate_main_llm_response(
         model=llm_request["model"],
         prompt=llm_request["prompt"],
     )
-    response_text = enforce_student_response_length(response_text)
+    response_text = enforce_student_response_length(sanitize_llm_output(response_text))
     return {
         "model": llm_request["model"],
         "prompt": llm_request["prompt"],
