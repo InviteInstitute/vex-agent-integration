@@ -54,7 +54,8 @@ def test_tick_detects_persists_and_delivers_wheel_spin(monkeypatch):
     try:
         result = trigger_service.run_proactive_tick(STUDENT, session_id)
 
-        # acted on the wheel_spin
+        # acted on the wheel_spin (this old fixture session also fires inactive, so
+        # there may be more than one acted trigger -- one proactive message per acted)
         assert any(a["trigger_type"] == "wheel_spin" for a in result["acted"])
 
         with get_conn() as conn:
@@ -63,7 +64,7 @@ def test_tick_detects_persists_and_delivers_wheel_spin(monkeypatch):
                     "SELECT count(*) FROM chat.messages WHERE student_id=%s AND origin='proactive'",
                     (STUDENT,),
                 )
-                assert cur.fetchone()[0] == 1  # exactly one proactive message
+                assert cur.fetchone()[0] == len(result["acted"])  # one message per acted trigger
                 cur.execute(
                     "SELECT acted, response_id FROM event_logs.agent_triggers "
                     "WHERE student_id=%s AND trigger_type='wheel_spin'",
