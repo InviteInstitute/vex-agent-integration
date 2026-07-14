@@ -26,6 +26,11 @@ Copy [.env.example](/Users/tiffanyvuu/Documents/College/Semester8/CIS4914/senior
 - `INVITE_HUB_BASE_URL`
 - `INVITE_HUB_USERNAME`
 - `INVITE_HUB_PASSWORD`
+- `TRIGGER_DAEMON_ENABLED` (proactive daemon, off by default)
+- `TRIGGER_POLL_INTERVAL_S`
+- `PROACTIVE_COOLDOWN_S`
+- `PROACTIVE_STUDENT_ALLOWLIST`
+- `PROACTIVE_CLASS_CODE`
 
 Example:
 
@@ -38,6 +43,14 @@ BACKEND_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 INVITE_HUB_BASE_URL=https://inviteinstitutehub.org
 INVITE_HUB_USERNAME=YOUR_USERNAME
 INVITE_HUB_PASSWORD=YOUR_PASSWORD
+
+# Proactive trigger daemon (off by default). Scope is fail-closed: leave both
+# allowlist vars empty and the daemon acts on nobody.
+TRIGGER_DAEMON_ENABLED=false
+TRIGGER_POLL_INTERVAL_S=20
+PROACTIVE_COOLDOWN_S=240
+PROACTIVE_STUDENT_ALLOWLIST=
+PROACTIVE_CLASS_CODE=
 ```
 
 ## Running Client and Server
@@ -94,6 +107,59 @@ Fetch and immediately parse + insert into Postgres:
 - Go to https://docs.rc.ufl.edu/training/NaviGator_Toolkit/ and follow instructions to set up API key.
 - For deployment, use `OPENAI_API_KEY` and `OPENAI_BASE_URL` environment variables.
 - `server/navigator_api_keys.json` should only be used as a local fallback.
+
+### Local Development With Ollama
+
+You can point the agent at a local [Ollama](https://ollama.com) instead of NaviGator. Set:
+
+```bash
+OPENAI_API_KEY=ollama
+OPENAI_BASE_URL=http://localhost:11434/v1
+NAVIGATOR_MODEL=llama3.2:latest
+```
+
+Any instruct model you have pulled works. Avoid reasoning models that emit `<think>` tags, since the one-sentence trimming keeps the reasoning instead of the answer.
+
+## Proactive Trigger Agent
+
+The agent can reach out on its own. It watches the VEX log stream, measures how a student's code changes between runs, and detects behavioral triggers (wheel-spinning, resilience, explorer, step-by-step, inactive). When one fires, it pushes a short piece of feedback without waiting for the student to ask. Design notes are in [docs/superpowers/specs/2026-07-14-proactive-triggers-design.md](docs/superpowers/specs/2026-07-14-proactive-triggers-design.md).
+
+Proactive messages reuse the normal feedback pipeline, so they share the same pedagogy as replies to a typed question. They are saved to `chat.messages` with `origin = 'proactive'` and delivered to the browser over Server-Sent Events.
+
+### Turning It On
+
+The daemon is off by default. In your repo root `.env`:
+
+```bash
+TRIGGER_DAEMON_ENABLED=true
+TRIGGER_POLL_INTERVAL_S=20
+PROACTIVE_COOLDOWN_S=240
+# Fail-closed: leave both empty and the daemon acts on nobody.
+PROACTIVE_STUDENT_ALLOWLIST=student_a,student_b
+PROACTIVE_CLASS_CODE=
+```
+
+Restart the backend and the daemon starts with it. It only ever acts on students in the allowlist, and it will not message the same student twice inside the cooldown window.
+
+### Trying It Without The Daemon
+
+Run one pass by hand for a single session, no timer needed:
+
+```bash
+curl -X POST http://127.0.0.1:8000/admin/tick \
+  -H "Content-Type: application/json" \
+  -d '{"student_id":"STUDENT_ID","session_id":"SESSION_ID"}'
+```
+
+The response lists the triggers it detected and the messages it pushed.
+
+### Watching The Stream
+
+The browser subscribes automatically once a student is set. To watch it from the terminal:
+
+```bash
+curl -N http://127.0.0.1:8000/v1/students/STUDENT_ID/stream
+```
 
 ## Deployment
 
