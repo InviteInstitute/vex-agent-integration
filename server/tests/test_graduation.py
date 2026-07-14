@@ -14,6 +14,16 @@ def test_resilience_and_inactive_are_acted():
     }
 
 
+def test_explorer_and_iterative_are_acted():
+    assert {"explorer", "iterative"} <= ACTED_TRIGGERS
+    assert feedback_classes_for_trigger("explorer") == {FeedbackClass.DIAGNOSE}
+    assert feedback_classes_for_trigger("iterative") == {FeedbackClass.EVIDENCE_BASED_PRAISE}
+
+
+def test_all_five_triggers_are_acted():
+    assert ACTED_TRIGGERS == {"wheel_spin", "resilience", "inactive", "explorer", "iterative"}
+
+
 def test_is_inactive_threshold():
     now = datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc)
     assert is_inactive(None, now) is False
