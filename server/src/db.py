@@ -193,3 +193,35 @@ def get_proactive_messages_after(student_id: str, after_id: int) -> list[dict]:
                 }
                 for row in cur.fetchall()
             ]
+
+
+def last_proactive_message_at(student_id: str):
+    """Timestamp of the most recent proactive message to a student, or None.
+    Backs the daemon's per-student cooldown."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT MAX(created_at)
+                FROM chat.messages
+                WHERE student_id = %s AND origin = 'proactive'
+                """,
+                (student_id,),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+
+
+def students_in_class(class_code: str) -> list[str]:
+    """Distinct student ids seen in a class, for allowlist-by-class scoping."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT student_id
+                FROM event_logs.parsed_events
+                WHERE class_code = %s
+                """,
+                (class_code,),
+            )
+            return [row[0] for row in cur.fetchall()]
