@@ -217,6 +217,42 @@ function App() {
   const messagesEndRef = useRef(null);
   const apiBase = defaultApiBase;
 
+  // Proactive push lane: subscribe to the SSE stream and append messages the agent
+  // pushes on its own (trigger-driven). The stream starts at the current head, so no
+  // history is replayed; we still dedupe by id in case a connection restarts.
+  useEffect(() => {
+    if (!studentId) {
+      return undefined;
+    }
+    const source = new EventSource(
+      `${apiBase}/students/${encodeURIComponent(studentId)}/stream`,
+    );
+    source.addEventListener("assistant_message", (event) => {
+      let payload;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      const proactiveId = `proactive-${payload.message_id}`;
+      setMessages((current) =>
+        current.some((message) => message.id === proactiveId)
+          ? current
+          : [
+              ...current,
+              {
+                id: proactiveId,
+                role: "assistant",
+                body: payload.message,
+                meta: "Proactive check-in",
+                canFeedback: false,
+              },
+            ],
+      );
+    });
+    return () => source.close();
+  }, [studentId, apiBase]);
+
   useEffect(() => {
     const endInteraction = () => {
       const pointerId = interactionRef.current?.pointerId;
