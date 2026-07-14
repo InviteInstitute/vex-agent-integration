@@ -151,3 +151,45 @@ def get_latest_session_id_for_student(student_id: str) -> str | None:
             )
             row = cur.fetchone()
             return str(row[0]) if row else None
+
+
+def latest_proactive_message_id(student_id: str) -> int:
+    """The newest proactive-message id for a student, or 0 if none. The SSE stream
+    starts here so a fresh connection delivers only messages pushed after it opens,
+    not the whole history."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COALESCE(MAX(id), 0)
+                FROM chat.messages
+                WHERE student_id = %s AND origin = 'proactive'
+                """,
+                (student_id,),
+            )
+            return cur.fetchone()[0]
+
+
+def get_proactive_messages_after(student_id: str, after_id: int) -> list[dict]:
+    """Proactive messages for a student with id > after_id, oldest first. Backs the
+    SSE poll (idx_messages_origin_student_created_at supports the filter)."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, message_text, response_id, created_at
+                FROM chat.messages
+                WHERE student_id = %s AND origin = 'proactive' AND id > %s
+                ORDER BY id ASC
+                """,
+                (student_id, after_id),
+            )
+            return [
+                {
+                    "id": row[0],
+                    "message_text": row[1],
+                    "response_id": str(row[2]) if row[2] else None,
+                    "created_at": row[3].isoformat() if row[3] else None,
+                }
+                for row in cur.fetchall()
+            ]

@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from src.routes.students import router as students_router
 from src.routes.admin import router as admin_router
+from src.routes.stream import router as stream_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +41,7 @@ app.add_middleware(
 )
 app.include_router(students_router)
 app.include_router(admin_router)
+app.include_router(stream_router)
 
 
 @app.get("/health")
