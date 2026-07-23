@@ -75,13 +75,18 @@ Background **thread** launched from FastAPI lifespan (thread, not asyncio task �
 psycopg/urllib/openai calls would block the event loop). Each tick (`TRIGGER_POLL_INTERVAL_S`,
 default 20s):
 1. `sync_invite_hub_logs()` — reuse existing incremental pull.
-2. **Scope filter (hard requirement, §8):** keep only students on the allowlist.
+2. **Scope filter (hard requirement, §8):** keep only students who have used this agent's chat (`students_in_chat`).
 3. Per in-scope session with new RUN events → `compute_run_edit_distances` → `detect_run_triggers_by_playground`.
 4. Sweep sustained `inactive` (scaffold).
-5. **Dedupe** against `agent_triggers` on `(student_id, session_id, trigger_type, run_index)`.
-6. **Per-student cooldown (§8):** skip if a proactive message was sent to this student in the last `PROACTIVE_COOLDOWN_S`.
-7. New in-scope **wheel_spin** rows → generate → persist assistant message → student's SSE picks it up.
+5. **Dedupe** against `agent_triggers` on `(student_id, session_id, trigger_type, run_index)`. This is also
+   what bounds re-messaging — each specific trigger fires at most once ever, so no timer/cooldown is needed.
+6. New in-scope **wheel_spin** rows → generate → persist assistant message → student's SSE picks it up.
    Other trigger types: persist the `agent_triggers` row only (detected, not acted on).
+
+> **Revised after delivery:** the per-student cooldown was removed in favour of the dedup bound above,
+> and scope was widened to **every student with telemetry** (`all_students`, all distinct `student_id`
+> in `parsed_events`) — the daemon now runs the agent for everyone, not an allowlist/class/chat subset.
+> The `PROACTIVE_*` env vars below are retired.
 
 Gated by `TRIGGER_DAEMON_ENABLED` (default **off** — dev/import never hammers prod).
 
@@ -112,16 +117,19 @@ Gated by `TRIGGER_DAEMON_ENABLED` (default **off** — dev/import never hammers 
 ## 7. Config (new env vars)
 - `TRIGGER_DAEMON_ENABLED` (default `false`)
 - `TRIGGER_POLL_INTERVAL_S` (default `20`)
-- `PROACTIVE_COOLDOWN_S` (default `240`)
-- `PROACTIVE_STUDENT_ALLOWLIST` / `PROACTIVE_CLASS_CODE` — scope (see §8)
+- ~~`PROACTIVE_COOLDOWN_S`~~ — retired (dedup bounds re-messaging).
+- ~~`PROACTIVE_STUDENT_ALLOWLIST` / `PROACTIVE_CLASS_CODE`~~ — retired; scope is now the chat roster (see §8).
 
 ## 8. Safety / trust boundary (NOT optional)
-`sync_invite_hub_logs()` pulls **every** prod event across all classes. The daemon must act
-only on an **allowlist** (a `classCode` or explicit student roster) — never the whole prod
-firehose. Auto-messaging real students is a consent boundary: v1 scopes to consented
-students only (e.g. class `FPFVDH` / demo IDs). **Fail closed:** an empty/unset allowlist
-means the daemon acts on *nobody* (it never defaults to "everyone"). Plus the **per-student
-cooldown** so an oscillating student (stuck → tiny edit re-arms → stuck) can't be spammed.
+`sync_invite_hub_logs()` pulls **every** prod event across all classes, and (per the researcher's
+call) the daemon's scope is now **every student with telemetry** (`all_students`). So when
+`TRIGGER_DAEMON_ENABLED=true` the daemon proactively messages real students across all synced
+classes — enabling it is therefore a deliberate, authorized act, not a default. Re-messaging is
+bounded by the `agent_triggers` dedup (§5.2 step 5): each specific trigger fires at most once, so an
+oscillating student (stuck → tiny edit re-arms → stuck) hears from the agent again only on genuinely
+new behavior, no timer required. **Open consideration:** with no recency filter, the first tick fires
+`inactive` for every historically idle student at once; add a `parsed_events.event_ts` window to
+`all_students` if that blast radius matters.
 
 ## 9. Spike learnings (server/poc_proactive_trigger.py)
 The walking-skeleton spike proved the chain end-to-end and surfaced three design changes,

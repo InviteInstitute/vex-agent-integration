@@ -2,23 +2,21 @@
 
 Runs in a thread (not an asyncio task) because run_proactive_tick's psycopg / urllib /
 openai calls are blocking and would stall the event loop. Each tick: sync logs, then
-for every IN-SCOPE student not in cooldown, run a proactive tick on their latest
-session.
+for every student using the chat, run a proactive tick on their latest session.
 
-SAFETY (not optional): the daemon acts only on an allowlist and never on the whole
-prod firehose. An empty/unset allowlist means it acts on NOBODY (fail closed). A
-per-student cooldown stops an oscillating student from being messaged repeatedly.
-Gated off by default (TRIGGER_DAEMON_ENABLED).
+SCOPE: the daemon acts on EVERY student it has telemetry for (all_students, i.e. every
+distinct student_id in parsed_events). Re-messaging is bounded not by a timer but by
+trigger dedup: each (student, session, trigger_type, run_index) fires at most once ever
+(agent_triggers UNIQUE), so a student only hears from the agent again when genuinely NEW
+behavior trips a trigger. Gated off by default (TRIGGER_DAEMON_ENABLED); when on it
+messages real students, so enabling it is a deliberate, authorized act.
 """
 import logging
 import os
 import threading
-from datetime import datetime, timezone
 
 from src.trigger_service import run_proactive_tick
-from src.db import (
-    get_latest_session_id_for_student, last_proactive_message_at, students_in_class,
-)
+from src.db import get_latest_session_id_for_student, all_students
 from src.log_sync import sync_invite_hub_logs
 
 log = logging.getLogger("trigger_daemon")
@@ -39,48 +37,25 @@ def poll_interval_s() -> float:
     return float(os.getenv("TRIGGER_POLL_INTERVAL_S", "20"))
 
 
-def cooldown_s() -> float:
-    return float(os.getenv("PROACTIVE_COOLDOWN_S", "240"))
-
-
 def in_scope_students() -> set[str]:
-    """Fail-closed allowlist: the union of PROACTIVE_STUDENT_ALLOWLIST (a comma list)
-    and the roster of PROACTIVE_CLASS_CODE. Empty/unset -> empty set -> act on nobody.
-    The daemon NEVER defaults to 'everyone in prod'."""
-    students: set[str] = set()
-    raw_allowlist = os.getenv("PROACTIVE_STUDENT_ALLOWLIST", "")
-    students.update(s.strip() for s in raw_allowlist.split(",") if s.strip())
-    class_code = os.getenv("PROACTIVE_CLASS_CODE", "").strip()
-    if class_code:
-        students.update(students_in_class(class_code))
-    return students
-
-
-def is_in_cooldown(last_at, now: datetime, cooldown_seconds: float) -> bool:
-    """True if a proactive message went out within the cooldown window."""
-    if last_at is None:
-        return False
-    return (now - last_at).total_seconds() < cooldown_seconds
+    """Scope = every student the agent has telemetry for. Runs the agent for everyone,
+    not just students who have used the chat."""
+    return set(all_students())
 
 
 def run_daemon_tick() -> dict:
-    """One pass over the in-scope roster. Returns {scoped, skipped_cooldown, acted}."""
+    """One pass over every student with telemetry. Returns {scoped, acted}."""
     students = in_scope_students()
-    if not students:  # fail-closed: nobody scoped -> do nothing, don't even hit prod
-        return {"scoped": 0, "skipped_cooldown": 0, "acted": []}
+    if not students:  # no telemetry yet -> do nothing, don't even hit prod
+        return {"scoped": 0, "acted": []}
 
     try:
         sync_invite_hub_logs()
     except Exception as error:  # a prod hiccup shouldn't kill the tick
         log.warning("Invite Hub sync failed this tick: %s", error)
 
-    now = datetime.now(timezone.utc)
-    cooldown = cooldown_s()
-    acted, skipped = [], 0
+    acted = []
     for student in students:
-        if is_in_cooldown(last_proactive_message_at(student), now, cooldown):
-            skipped += 1
-            continue
         session_id = get_latest_session_id_for_student(student)
         if not session_id:
             continue
@@ -90,7 +65,7 @@ def run_daemon_tick() -> dict:
             log.warning("proactive tick failed for %s: %s", student, error)
             continue
         acted.extend(result["acted"])
-    return {"scoped": len(students), "skipped_cooldown": skipped, "acted": acted}
+    return {"scoped": len(students), "acted": acted}
 
 
 # --- lifecycle: a daemon thread driven off the FastAPI lifespan ---

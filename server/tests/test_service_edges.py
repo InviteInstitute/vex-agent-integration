@@ -23,7 +23,7 @@ def test_start_daemon_is_idempotent(monkeypatch):
     monkeypatch.setenv("TRIGGER_DAEMON_ENABLED", "true")
     monkeypatch.setenv("TRIGGER_POLL_INTERVAL_S", "0.02")
     monkeypatch.setattr(td, "run_daemon_tick",
-                        lambda: {"scoped": 0, "skipped_cooldown": 0, "acted": []})
+                        lambda: {"scoped": 0, "acted": []})
     try:
         td.start_daemon()
         first = td._thread

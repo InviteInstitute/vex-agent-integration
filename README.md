@@ -28,9 +28,6 @@ Copy [.env.example](/Users/tiffanyvuu/Documents/College/Semester8/CIS4914/senior
 - `INVITE_HUB_PASSWORD`
 - `TRIGGER_DAEMON_ENABLED` (proactive daemon, off by default)
 - `TRIGGER_POLL_INTERVAL_S`
-- `PROACTIVE_COOLDOWN_S`
-- `PROACTIVE_STUDENT_ALLOWLIST`
-- `PROACTIVE_CLASS_CODE`
 
 Example:
 
@@ -44,13 +41,10 @@ INVITE_HUB_BASE_URL=https://inviteinstitutehub.org
 INVITE_HUB_USERNAME=YOUR_USERNAME
 INVITE_HUB_PASSWORD=YOUR_PASSWORD
 
-# Proactive trigger daemon (off by default). Scope is fail-closed: leave both
-# allowlist vars empty and the daemon acts on nobody.
-TRIGGER_DAEMON_ENABLED=false
+# Proactive trigger daemon. Scope is every student with telemetry; when on it
+# proactively messages real students. scripts/start.sh follows this flag.
+TRIGGER_DAEMON_ENABLED=true
 TRIGGER_POLL_INTERVAL_S=20
-PROACTIVE_COOLDOWN_S=240
-PROACTIVE_STUDENT_ALLOWLIST=
-PROACTIVE_CLASS_CODE=
 ```
 
 ## Running Client and Server
@@ -133,13 +127,9 @@ The daemon is off by default. In your repo root `.env`:
 ```bash
 TRIGGER_DAEMON_ENABLED=true
 TRIGGER_POLL_INTERVAL_S=20
-PROACTIVE_COOLDOWN_S=240
-# Fail-closed: leave both empty and the daemon acts on nobody.
-PROACTIVE_STUDENT_ALLOWLIST=student_a,student_b
-PROACTIVE_CLASS_CODE=
 ```
 
-Restart the backend and the daemon starts with it. It only ever acts on students in the allowlist, and it will not message the same student twice inside the cooldown window.
+Restart the backend and the daemon starts with it. `scripts/start.sh` reads this flag from `.env` (it does not force it), so set `TRIGGER_DAEMON_ENABLED=true` there to run it. Its scope is **every student with telemetry** in `parsed_events`, so when on it proactively messages real students. It will not repeat a message, because each specific trigger (student, session, trigger type, run) fires at most once, so a student only hears from the agent again when genuinely new behavior trips a trigger.
 
 ### Trying It Without The Daemon
 

@@ -5,9 +5,10 @@ import psycopg
 from psycopg.types.json import Json
 from dotenv import load_dotenv
 
+load_dotenv()  # once at import, not on every query
+
 
 def get_conn() -> psycopg.Connection:
-    load_dotenv()
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL is not set")
@@ -195,33 +196,12 @@ def get_proactive_messages_after(student_id: str, after_id: int) -> list[dict]:
             ]
 
 
-def last_proactive_message_at(student_id: str):
-    """Timestamp of the most recent proactive message to a student, or None.
-    Backs the daemon's per-student cooldown."""
+def all_students() -> list[str]:
+    """Every student the agent has telemetry for -- the daemon's scope when it runs
+    for everyone (not just the chat roster). Sourced from synced parsed_events.
+    ponytail: all-time; add a `WHERE event_ts > NOW() - INTERVAL '1 day'` window if
+    the daemon should only chase currently-active students, not every historical id."""
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT MAX(created_at)
-                FROM chat.messages
-                WHERE student_id = %s AND origin = 'proactive'
-                """,
-                (student_id,),
-            )
-            row = cur.fetchone()
-            return row[0] if row else None
-
-
-def students_in_class(class_code: str) -> list[str]:
-    """Distinct student ids seen in a class, for allowlist-by-class scoping."""
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT DISTINCT student_id
-                FROM event_logs.parsed_events
-                WHERE class_code = %s
-                """,
-                (class_code,),
-            )
+            cur.execute("SELECT DISTINCT student_id FROM event_logs.parsed_events")
             return [row[0] for row in cur.fetchall()]
