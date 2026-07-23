@@ -193,7 +193,7 @@ def create_response(
     robot_behavior_summary = "None"
     recent_messages: list[dict[str, str]] = []
 
-    # Refresh event logs
+    # Refresh event logs — always pull so feedback reflects the student's newest run
     sync_invite_hub_logs(student_id=student_id)
 
     if task and payload.student_message:
@@ -206,10 +206,6 @@ def create_response(
                 student_id=student_id,
                 session_id=resolved_session_id,
             )
-            #debug
-            # for event in events[-10:]:
-            #     print(f"students.py l 207: Event ID: {event.id}, Type: {event.event_type}, Playground: {event.playground}, Timestamp: {event.event_ts.isoformat()}")
-
             current_playground, _ = select_current_playground_segment(events)
             if current_playground != DEFAULT_PLAYGROUND:
                 response_text = WRONG_PLAYGROUND_MESSAGE

@@ -16,6 +16,7 @@ venv/
 
 # Python test/cache
 .pytest_cache/
+.coverage
 
 # React / Node frontend
 node_modules/

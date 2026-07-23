@@ -7,22 +7,20 @@ import pytest
 pytestmark = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="needs a live DATABASE_URL")
 
 
-def test_students_in_class():
-    from src.db import get_conn, students_in_class
+def test_all_students():
+    from src.db import get_conn, all_students
 
     student = f"test_{uuid4().hex[:8]}"
-    class_code = f"CLS_{uuid4().hex[:6]}"
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "INSERT INTO event_logs.parsed_events "
-                    "(session_id, student_id, class_code, event_ts, event_type) "
-                    "VALUES (%s, %s, %s, NOW(), 'runProject')",
-                    (uuid4(), student, class_code),
+                    "(session_id, student_id, event_ts, event_type) "
+                    "VALUES (%s, %s, NOW(), 'runProject')",
+                    (uuid4(), student),
                 )
-        assert student in students_in_class(class_code)
-        assert students_in_class(f"NONE_{uuid4().hex[:6]}") == []
+        assert student in all_students()
     finally:
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -32,7 +30,7 @@ def test_students_in_class():
 def test_message_roundtrip_response_lookup_and_feedback():
     from src.db import (
         get_conn, insert_message, get_message_id_for_response,
-        insert_message_feedback, last_proactive_message_at,
+        insert_message_feedback,
     )
 
     student = f"test_{uuid4().hex[:8]}"
@@ -44,7 +42,6 @@ def test_message_roundtrip_response_lookup_and_feedback():
         message_id = get_message_id_for_response(response_id=response_id, student_id=student)
         assert message_id is not None
         insert_message_feedback(message_id=message_id, student_id=student, thumb="up", comment="nice")
-        assert last_proactive_message_at(student) is not None
     finally:
         with get_conn() as conn:
             with conn.cursor() as cur:

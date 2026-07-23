@@ -195,6 +195,20 @@ def parse_source_log_id(record: dict[str, Any]) -> int:
     return source_log_id
 
 
+def parse_event_time(record: dict[str, Any]) -> datetime | None:
+    """The event's received timestamp as an aware UTC datetime, or None. Prod's
+    serializer shipped the key misspelled as 'recieved_at'; accept the corrected
+    'received_at' too (matches lm-dashboard, which reads the same API)."""
+    raw = record.get("recieved_at") or record.get("received_at")
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
 def read_sync_state(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
@@ -204,10 +218,13 @@ def read_sync_state(path: Path) -> dict[str, Any]:
     return payload
 
 
-def write_sync_state(path: Path, last_source_log_id: int) -> None:
+def write_sync_state(
+    path: Path, last_source_log_id: int, last_event_time: str | None = None
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "last_source_log_id": last_source_log_id,
+        "last_event_time": last_event_time,  # ISO ts of the newest event; drives dateFrom
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -237,7 +254,11 @@ def fetch_vex_logs_incremental(
     *,
     page_size: int,
     last_source_log_id: int | None,
+    date_from: str | None = None,
 ) -> list[dict[str, Any]]:
+    # date_from: server-side dateFrom filter (lm-dashboard's approach) so a drain reads
+    # only events at/after the cursor instead of paging all history. The existing
+    # last_source_log_id filter below still dedupes the small overlap window.
     records: list[dict[str, Any]] = []
     offset = 0
     seen_ids: set[int] = set()
@@ -248,9 +269,10 @@ def fetch_vex_logs_incremental(
             f"offset={offset}",
             f"page_size={page_size}",
             f"last_source_log_id={last_source_log_id}",
+            f"date_from={date_from}",
             flush=True,
         )
-        page_query = build_query_string(offset=offset, limit=page_size)
+        page_query = build_query_string(offset=offset, limit=page_size, date_from=date_from)
         if query_string:
             page_query = f"{page_query}&{query_string}"
         payload = request_json(f"{base_url}/api/rabbitmq/vex_logs/?{page_query}", token=token)

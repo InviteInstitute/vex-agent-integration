@@ -27,7 +27,6 @@ class FeedbackClass(Enum):
     NUDGE = "Nudge"
     DIAGNOSE = "Diagnose"
     QUESTION = "Question"
-    # FILL_IN_THE_BLANK = "Fill-in-the-blank"
     ELABORATE = "Elaborate"
     REPEAT = "Repeat"
     NEXT_STEP = "Next Step"
@@ -76,12 +75,10 @@ def determine_feedback_class(snapshot: CurrentStateSnapshot) -> set[FeedbackClas
         if persistence in {"EXPECTED_COMPLETION", "EARLY_QUITTER"}:
             feedback_classes.add(FeedbackClass.DIAGNOSE)
 
-        # TO DO: always reassure, first two times elaborate, after fill in the blank
         # -> b.ii, c.vii, c.viii
         if persistence == "HIGH_PERSISTER":
             feedback_classes.update({
                 FeedbackClass.REASSURE,
-                # FeedbackClass.FILL_IN_THE_BLANK,
                 FeedbackClass.ELABORATE,
             })
 
