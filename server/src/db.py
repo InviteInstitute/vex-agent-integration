@@ -172,16 +172,20 @@ def latest_proactive_message_id(student_id: str) -> int:
 
 
 def get_proactive_messages_after(student_id: str, after_id: int) -> list[dict]:
-    """Proactive messages for a student with id > after_id, oldest first. Backs the
-    SSE poll (idx_messages_origin_student_created_at supports the filter)."""
+    """Proactive messages for a student with id > after_id, oldest first, each carrying
+    the trigger that caused it. The shared response_id links a message to its
+    agent_triggers row; LEFT JOIN so a message with no matching trigger still comes
+    through (trigger_type = None). Backs the SSE poll."""
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, message_text, response_id, created_at
-                FROM chat.messages
-                WHERE student_id = %s AND origin = 'proactive' AND id > %s
-                ORDER BY id ASC
+                SELECT m.id, m.message_text, m.response_id, m.created_at,
+                       t.trigger_type, t.detail_json->>'value' AS trigger_why
+                FROM chat.messages m
+                LEFT JOIN event_logs.agent_triggers t ON t.response_id = m.response_id
+                WHERE m.student_id = %s AND m.origin = 'proactive' AND m.id > %s
+                ORDER BY m.id ASC
                 """,
                 (student_id, after_id),
             )
@@ -191,6 +195,8 @@ def get_proactive_messages_after(student_id: str, after_id: int) -> list[dict]:
                     "message_text": row[1],
                     "response_id": str(row[2]) if row[2] else None,
                     "created_at": row[3].isoformat() if row[3] else None,
+                    "trigger_type": row[4],
+                    "trigger_why": row[5],
                 }
                 for row in cur.fetchall()
             ]
