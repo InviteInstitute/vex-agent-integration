@@ -27,6 +27,8 @@ def format_sse_event(message: dict) -> str:
         "message": message["message_text"],
         "created_at": message.get("created_at"),
         "origin": "proactive",
+        "trigger_type": message.get("trigger_type"),
+        "trigger_why": message.get("trigger_why"),
     }
     return f"event: assistant_message\ndata: {json.dumps(payload)}\n\n"
 

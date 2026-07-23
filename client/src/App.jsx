@@ -246,6 +246,8 @@ function App() {
                 body: payload.message,
                 meta: "Proactive check-in",
                 canFeedback: false,
+                trigger: payload.trigger_type,
+                triggerWhy: payload.trigger_why,
               },
             ],
       );
@@ -876,6 +878,25 @@ function App() {
                         )}
                       </div>
                       <span className="message-meta">{message.meta}</span>
+                      {message.trigger ? (
+                        <span
+                          className="trigger-badge"
+                          title="The behavior that triggered this proactive message"
+                          style={{
+                            display: "inline-block",
+                            marginTop: "4px",
+                            padding: "2px 8px",
+                            borderRadius: "999px",
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            background: "rgba(124, 58, 237, 0.12)",
+                            color: "#7c3aed",
+                          }}
+                        >
+                          ⚡ {message.trigger}
+                          {message.triggerWhy ? ` · ${message.triggerWhy}` : ""}
+                        </span>
+                      ) : null}
                       {message.role === "assistant" && message.canFeedback ? (
                         <div className="feedback-panel">
                           <div className="feedback-actions">
