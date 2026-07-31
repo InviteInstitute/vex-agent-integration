@@ -15,7 +15,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_insert_dedupes_on_run_index():
-    from src.db import insert_agent_trigger_if_new, get_conn
+    from vex_agent.db import insert_agent_trigger_if_new, get_conn
 
     session_id = str(uuid4())
     student_id = f"test_{uuid4().hex[:8]}"
@@ -48,7 +48,7 @@ def test_insert_dedupes_on_run_index():
 def test_latest_inactive_and_resolve_lifecycle():
     # the re-alert lifecycle: latest_inactive_trigger finds the most recent fire,
     # resolve_open_inactive_triggers closes open ones when the student recovers.
-    from src.db import (
+    from vex_agent.db import (
         insert_agent_trigger_if_new, latest_inactive_trigger,
         resolve_open_inactive_triggers, get_conn,
     )

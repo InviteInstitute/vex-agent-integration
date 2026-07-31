@@ -1,9 +1,4 @@
-fastapi==0.116.1
-openai==1.108.1
-psycopg[binary]==3.2.10
-python-dotenv==1.1.1
-apted>=1.0                # per-run code-diff signal: APTED tree-edit distance (trigger engine)
-uvicorn==0.35.0
-pytest==8.4.2
-itsdangerous>=2.1         # signs the "solved Turnstile" cookie (src/turnstile.py)
-httpx                     # Turnstile siteverify call (already pulled in by openai, pinned explicitly)
+# Runtime dependencies now live in pyproject.toml (single source of truth).
+# This file stays so `pip install -r requirements.txt` keeps working (Docker/Render).
+# Local dev + tests:  pip install -e '.[dev]'
+.

@@ -13,12 +13,12 @@ def _daemon_off_unless_set(monkeypatch):
     # Drop the run-distance cache between tests so a cached sequence from one test
     # can't satisfy another (the cache is keyed on (student, session) + event signature,
     # but clearing keeps the isolation story simple and explicit).
-    from src.trigger_service import clear_run_cache
+    from vex_agent.trigger_service import clear_run_cache
     clear_run_cache()
     # Drop the cached LLM client between tests so a fake client monkeypatched into
     # create_openai_client() by one test can't leak into another.
-    from src.llm_service import clear_client_cache
+    from vex_agent.llm_service import clear_client_cache
     clear_client_cache()
     # Same for the cached Invite Hub auth token.
-    from src.fetch_invite_hub_logs import clear_cached_token
+    from vex_agent.fetch_invite_hub_logs import clear_cached_token
     clear_cached_token()

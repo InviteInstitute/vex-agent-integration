@@ -8,7 +8,7 @@ only; the DB-coupled sustained `inactive` sweep lives in a later slice).
   explorer   : a single run with edit_distance >= EXPLORER_EDIT_DISTANCE.
   iterative  : ITERATIVE_DEFAULT_THRESHOLD runs with edit_distance > 0 (steady edits).
 """
-from src.triggers.constants import (
+from vex_agent.triggers.constants import (
     WHEEL_SPIN_ZERO_RUNS, RESILIENCE_ZERO_RUNS, EXPLORER_EDIT_DISTANCE,
     ITERATIVE_EDIT_MIN, ITERATIVE_DEFAULT_THRESHOLD, ITERATIVE_THRESHOLDS,
     TRIGGER_LABELS as LABELS,

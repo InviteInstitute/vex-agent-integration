@@ -4,10 +4,8 @@ Feedback Policy
 
 from enum import Enum
 
-try:
-    from src.current_state_metrics import CurrentStateSnapshot
-except ModuleNotFoundError:
-    from server.src.current_state_metrics import CurrentStateSnapshot
+from vex_agent.current_state_metrics import CurrentStateSnapshot
+
 
 class FeedbackClass(Enum):
     # Acknowledge / Notify

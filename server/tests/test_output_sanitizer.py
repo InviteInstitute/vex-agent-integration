@@ -1,6 +1,6 @@
 """Tests for the output sanitizer (issue #7). Cases are the exact leaks the spike
 produced on llama3.2, plus clean inputs that must pass through untouched."""
-from src.output_sanitizer import sanitize_llm_output
+from vex_agent.output_sanitizer import sanitize_llm_output
 
 
 def test_strips_leading_label():

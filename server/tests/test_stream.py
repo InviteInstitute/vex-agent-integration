@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from src.routes.stream import format_sse_event
+from vex_agent.routes.stream import format_sse_event
 
 
 def test_format_sse_event_frame():
@@ -23,7 +23,7 @@ def test_format_sse_event_frame():
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="needs a live DATABASE_URL")
 def test_proactive_poll_helpers_filter_and_advance():
-    from src.db import (
+    from vex_agent.db import (
         insert_message, latest_proactive_message_id, get_proactive_messages_after, get_conn,
     )
     student = f"test_{uuid4().hex[:8]}"
@@ -50,7 +50,7 @@ def test_proactive_poll_helpers_filter_and_advance():
 
 @pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="needs a live DATABASE_URL")
 def test_proactive_message_carries_its_trigger():
-    from src.db import (
+    from vex_agent.db import (
         insert_message, insert_agent_trigger_if_new, mark_agent_trigger_acted,
         get_proactive_messages_after, get_conn,
     )

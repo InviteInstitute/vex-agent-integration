@@ -25,9 +25,9 @@ import os
 import random
 import threading
 
-from src.trigger_service import run_proactive_tick
-from src.db import get_latest_session_id_for_student, all_students
-from src.log_sync import sync_invite_hub_logs
+from vex_agent.trigger_service import run_proactive_tick
+from vex_agent.db import get_latest_session_id_for_student, all_students
+from vex_agent.log_sync import sync_invite_hub_logs
 
 log = logging.getLogger("trigger_daemon")
 

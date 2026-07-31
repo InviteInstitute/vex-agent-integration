@@ -2,7 +2,7 @@
 branches (the parts test_trigger_daemon.py's pure tests don't reach)."""
 import threading
 
-from src import trigger_daemon as td
+from vex_agent import trigger_daemon as td
 
 
 def test_config_getters(monkeypatch):

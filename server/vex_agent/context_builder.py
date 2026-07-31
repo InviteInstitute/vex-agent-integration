@@ -5,7 +5,7 @@ Context Builder
 from dataclasses import dataclass, field
 from typing import List
 
-from src.feedback_policy import FeedbackClass
+from vex_agent.feedback_policy import FeedbackClass
 
 @dataclass
 class FeedbackSpec:

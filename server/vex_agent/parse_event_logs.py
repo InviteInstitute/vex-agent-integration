@@ -7,13 +7,7 @@ from typing import Any
 
 from psycopg.types.json import Json
 
-try:
-    from src.db import get_conn
-except ModuleNotFoundError:
-    try:
-        from server.src.db import get_conn
-    except ModuleNotFoundError:
-        from db import get_conn
+from vex_agent.db import get_conn
 
 
 _last_skip_summary: dict[str, int] = {}

@@ -28,12 +28,12 @@ services:
     ports:
       - "127.0.0.1:8001:8000"
     volumes:
-      # Invite Hub sync cursor (src/log_sync.py). Bind-mounted so a container
+      # Invite Hub sync cursor (vex_agent/log_sync.py). Bind-mounted so a container
       # rebuild/recreate can't wipe it back to zero, which forces the next sync
       # into a full-history re-drain (thousands of sequential Hub requests) --
       # that drain runs *inline* in the request path (maybe_sync_invite_hub_logs),
       # so it was blocking real chat requests for minutes. Bit us once already.
-      - ./server/state/invite_hub_sync_state.json:/app/src/invite_hub_sync_state.json
+      - ./server/state/invite_hub_sync_state.json:/app/vex_agent/invite_hub_sync_state.json
 
 volumes:
   pgdata:

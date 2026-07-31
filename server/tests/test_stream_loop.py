@@ -2,7 +2,7 @@
 without a live server or DB."""
 import asyncio
 
-from src.routes import stream as S
+from vex_agent.routes import stream as S
 
 
 def test_event_stream_delivers_message_then_keepalive(monkeypatch):

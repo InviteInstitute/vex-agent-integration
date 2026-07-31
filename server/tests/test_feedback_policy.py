@@ -1,21 +1,11 @@
-try:
-    from server.src.current_state_metrics import (
-        ActionLevel,
-        CognitionCategory,
-        CurrentStateSnapshot,
-        Direction,
-        PersistenceCategory,
-    )
-    from server.src.feedback_policy import FeedbackClass, determine_feedback_class
-except ModuleNotFoundError:
-    from src.current_state_metrics import (
-        ActionLevel,
-        CognitionCategory,
-        CurrentStateSnapshot,
-        Direction,
-        PersistenceCategory,
-    )
-    from src.feedback_policy import FeedbackClass, determine_feedback_class
+from vex_agent.current_state_metrics import (
+    ActionLevel,
+    CognitionCategory,
+    CurrentStateSnapshot,
+    Direction,
+    PersistenceCategory,
+)
+from vex_agent.feedback_policy import FeedbackClass, determine_feedback_class
 
 
 def make_snapshot(

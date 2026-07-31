@@ -4,7 +4,7 @@ here so it stays covered (and correct) rather than rotting. Vendored from
 lm-dashboard/tests/test_smart_delta_delta.py."""
 import json
 
-from src.triggers.smart_delta import SmartDeltaEngine
+from vex_agent.triggers.smart_delta import SmartDeltaEngine
 
 
 def _evt(block_event):

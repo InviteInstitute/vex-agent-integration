@@ -2,8 +2,8 @@
 (start idempotency)."""
 from datetime import datetime, timedelta, timezone
 
-from src import trigger_service as ts
-from src import trigger_daemon as td
+from vex_agent import trigger_service as ts
+from vex_agent import trigger_daemon as td
 
 
 def test_detect_inactive_no_events(monkeypatch):

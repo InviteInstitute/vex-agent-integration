@@ -1,6 +1,6 @@
 """humanize: readable program listing with parameters. Vendored from the
 self-check in lm-dashboard/app/runs/humanize.py (no dedicated test file there)."""
-from src.triggers.humanize import humanize_workspace, humanize_text
+from vex_agent.triggers.humanize import humanize_workspace, humanize_text
 
 
 DEMO = (

@@ -1,8 +1,8 @@
 """Edge-case coverage for the vendored engine: distance cache/multi-root/field
 changes, workspace-XML extraction variants, and JSON-string event content."""
-from src.triggers.distance import compute_edit_distance, cached_edit_distance, clear_cache
-from src.triggers.ast_builder import xml_to_block_ast, extract_workspace_xml
-from src.triggers.run_sequence import compute_run_edit_distances
+from vex_agent.triggers.distance import compute_edit_distance, cached_edit_distance, clear_cache
+from vex_agent.triggers.ast_builder import xml_to_block_ast, extract_workspace_xml
+from vex_agent.triggers.run_sequence import compute_run_edit_distances
 
 XMLNS = 'xmlns="https://developers.google.com/blockly/xml"'
 EMPTY = f"<xml {XMLNS}></xml>"

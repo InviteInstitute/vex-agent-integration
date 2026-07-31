@@ -4,8 +4,8 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException
 
-from src.block_catalog import resolve_available_blocks
-from src.current_state_metrics import (
+from vex_agent.block_catalog import resolve_available_blocks
+from vex_agent.current_state_metrics import (
     build_current_program,
     build_episode_summary,
     build_raw_logs_context,
@@ -14,16 +14,16 @@ from src.current_state_metrics import (
     has_active_project_run,
     select_current_playground_segment,
 )
-from src.db import (
+from vex_agent.db import (
     get_latest_session_id_for_student,
     get_message_id_for_response,
     insert_message,
     insert_message_feedback,
 )
-from src.feedback_policy import FeedbackClass, determine_feedback_class
-from src.llm_service import generate_main_llm_response, generate_robot_behavior_summary
-from src.log_sync import sync_invite_hub_logs
-from src.schemas import (
+from vex_agent.feedback_policy import FeedbackClass, determine_feedback_class
+from vex_agent.llm_service import generate_main_llm_response, generate_robot_behavior_summary
+from vex_agent.log_sync import sync_invite_hub_logs
+from vex_agent.schemas import (
     FeedbackRequest,
     FeedbackResponse,
     MessageRequest,
@@ -32,8 +32,8 @@ from src.schemas import (
     StudentResponseRequest,
     StudentResponseResponse,
 )
-from src.session_service import append_session_message, get_recent_session_messages
-from src.task_catalog import resolve_task_description
+from vex_agent.session_service import append_session_message, get_recent_session_messages
+from vex_agent.task_catalog import resolve_task_description
 
 router = APIRouter(prefix="/v1", tags=["students"])
 logger = logging.getLogger(__name__)

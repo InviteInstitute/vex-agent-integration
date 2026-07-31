@@ -17,7 +17,7 @@ STUDENT = "fixture_07_1"
 
 
 def _session_for(student):
-    from src.db import get_conn
+    from vex_agent.db import get_conn
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -30,7 +30,7 @@ def _session_for(student):
 
 
 def _cleanup(student):
-    from src.db import get_conn
+    from vex_agent.db import get_conn
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM chat.messages WHERE student_id=%s AND origin='proactive'", (student,))
@@ -38,8 +38,8 @@ def _cleanup(student):
 
 
 def test_tick_detects_persists_and_delivers_wheel_spin(monkeypatch):
-    from src import trigger_service
-    from src.db import get_conn
+    from vex_agent import trigger_service
+    from vex_agent.db import get_conn
 
     session_id = _session_for(STUDENT)
     assert session_id is not None

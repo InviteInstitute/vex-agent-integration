@@ -1,7 +1,7 @@
 """Episode segmentation: CODE/RUN/RESET carving, soft-event absorption, and the
 two pause detectors. Vendored from lm-dashboard/tests/test_segmenter.py."""
-from src.triggers.episode_engine import segment_session
-from src.triggers.constants import PAUSE_THRESHOLD_S, SHORT_PAUSE_MIN_S
+from vex_agent.triggers.episode_engine import segment_session
+from vex_agent.triggers.constants import PAUSE_THRESHOLD_S, SHORT_PAUSE_MIN_S
 
 
 def _e(et, ts):

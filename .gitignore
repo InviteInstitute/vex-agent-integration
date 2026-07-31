@@ -11,6 +11,7 @@ server/navigator_api_keys.json
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
 venv/
 

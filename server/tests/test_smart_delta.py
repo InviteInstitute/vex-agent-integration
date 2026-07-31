@@ -1,7 +1,7 @@
 """The smart-delta engine's live path: workspace XML -> token-efficient
 [Active]/[Orphaned] prompt for the playground panel. Vendored from
 lm-dashboard/tests/test_smart_delta.py."""
-from src.triggers.smart_delta import generate_llm_prompt_from_project
+from vex_agent.triggers.smart_delta import generate_llm_prompt_from_project
 
 
 def _project(workspace_xml):

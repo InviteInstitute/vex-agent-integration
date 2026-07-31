@@ -375,13 +375,7 @@ def count_download_records(text: str) -> int:
 
 
 def load_parse_helpers() -> tuple[Any, Any, Any]:
-    try:
-        from src.parse_event_logs import insert_rows, parse_records, parse_text_blob
-    except ModuleNotFoundError:
-        try:
-            from server.src.parse_event_logs import insert_rows, parse_records, parse_text_blob
-        except ModuleNotFoundError:
-            from parse_event_logs import insert_rows, parse_records, parse_text_blob
+    from vex_agent.parse_event_logs import insert_rows, parse_records, parse_text_blob
 
     return insert_rows, parse_records, parse_text_blob
 

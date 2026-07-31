@@ -4,6 +4,6 @@
 # Usage: scripts/stop.sh
 set -uo pipefail
 
-pkill -f "uvicorn src.app" 2>/dev/null && echo "stopped backend" || echo "backend not running"
+pkill -f "uvicorn vex_agent.app" 2>/dev/null && echo "stopped backend" || echo "backend not running"
 pkill -f "vite" 2>/dev/null && echo "stopped frontend" || echo "frontend not running"
 echo "(Postgres/Ollama left running)"

@@ -189,7 +189,7 @@ def to_event_record(row: dict[str, Any]) -> EventRecord:
 def fetch_events_from_db(student_id: str, session_id: str) -> list[EventRecord]:
     from psycopg.rows import dict_row
 
-    from src.db import get_conn
+    from vex_agent.db import get_conn
 
     sql = """
     SELECT
@@ -278,9 +278,9 @@ def build_current_program(
     project snapshot exists.
 
     Pass `events` to skip a redundant DB fetch (the reactive route already has them)."""
-    from src.triggers.smart_delta import generate_llm_prompt_from_project
-    from src.triggers.humanize import humanize_text
-    from src.triggers.ast_builder import extract_workspace_xml
+    from vex_agent.triggers.smart_delta import generate_llm_prompt_from_project
+    from vex_agent.triggers.humanize import humanize_text
+    from vex_agent.triggers.ast_builder import extract_workspace_xml
 
     if events is None:
         events = fetch_events_from_db(student_id=student_id, session_id=session_id)
@@ -329,7 +329,7 @@ def _events_to_segmenter_input(events: list[EventRecord]) -> list[dict]:
 def segment_episodes_for_events(events: list[EventRecord]) -> tuple[list[dict], list[dict]]:
     """Segment an EventRecord list into CODE/RUN/RESET episodes + pauses, via the
     vendored episode_engine. Returns (episodes, pauses). Pure (no DB)."""
-    from src.triggers.episode_engine import segment_session
+    from vex_agent.triggers.episode_engine import segment_session
     if not events:
         return [], []
     return segment_session(_events_to_segmenter_input(events))
@@ -660,7 +660,7 @@ def analyze_current_state(events: list[EventRecord]) -> CurrentStateSnapshot:
 
 
 def upsert_snapshot(snapshot: CurrentStateSnapshot) -> None:
-    from src.db import get_conn
+    from vex_agent.db import get_conn
 
     sql = """
     INSERT INTO current_state.state_snapshots (

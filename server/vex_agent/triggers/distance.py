@@ -1,7 +1,7 @@
 """
 Turning two block ASTs into an integer edit_distance via tree-edit distance.
 Vendored from lm-dashboard/app/runs/apted_similarity.py (only the import path changed:
-constants now come from src.triggers.constants).
+constants now come from vex_agent.triggers.constants).
 
 Converts an AST dict into an APTED tree and applies a Blockly-specific edit cost
 configuration (Hyeongjo's colab costs) whose result is the raw integer tree-edit
@@ -12,7 +12,7 @@ import hashlib
 from collections import defaultdict
 from apted import APTED, Config
 
-from src.triggers.constants import (
+from vex_agent.triggers.constants import (
     BLOCK_DELETE_COST, BLOCK_INSERT_COST, EDGE_DELETE_COST, EDGE_INSERT_COST,
     FIELD_CHANGE_COST, TYPE_CHANGE_COST, EDGE_CHANGE_COST,
 )

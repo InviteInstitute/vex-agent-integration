@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vex-agent"
+version = "0.1.0"
+description = "Pedagogical AI agent for VEXcode VR — reactive + proactive feedback."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.116.1",
+    "openai==1.108.1",
+    "psycopg[binary]==3.2.10",
+    "python-dotenv==1.1.1",
+    "apted>=1.0",              # per-run code-diff signal: APTED tree-edit distance (trigger engine)
+    "uvicorn==0.35.0",
+    "itsdangerous>=2.1",       # signs the "solved Turnstile" cookie (api/turnstile)
+    "httpx",                   # Turnstile siteverify (also pulled in by openai)
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.4.2"]
+
+[project.scripts]
+vex-parse-logs = "vex_agent.parse_event_logs:main"
+vex-fetch-logs = "vex_agent.fetch_invite_hub_logs:main"
+
+[tool.setuptools.packages.find]
+include = ["vex_agent*"]
+
+[tool.setuptools.package-data]
+vex_agent = ["triggers/vex_blocks.json"]

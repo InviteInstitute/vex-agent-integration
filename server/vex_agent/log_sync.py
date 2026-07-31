@@ -8,38 +8,21 @@ from pathlib import Path
 # skipped; the last_source_log_id filter drops the re-fetched duplicates.
 SYNC_OVERLAP_SECONDS = 2
 
-try:
-    from src.fetch_invite_hub_logs import (
-        DEFAULT_BASE_URL,
-        DEFAULT_PAGE_SIZE,
-        DEFAULT_STATE_PATH,
-        build_query_string,
-        clear_cached_token,
-        fetch_vex_logs_incremental,
-        get_auth_token,
-        load_local_env,
-        parse_source_log_id,
-        parse_event_time,
-        read_sync_state,
-        write_sync_state,
-    )
-    from src.parse_event_logs import insert_rows, parse_records
-except ModuleNotFoundError:
-    from server.src.fetch_invite_hub_logs import (
-        DEFAULT_BASE_URL,
-        DEFAULT_PAGE_SIZE,
-        DEFAULT_STATE_PATH,
-        build_query_string,
-        clear_cached_token,
-        fetch_vex_logs_incremental,
-        get_auth_token,
-        load_local_env,
-        parse_source_log_id,
-        parse_event_time,
-        read_sync_state,
-        write_sync_state,
-    )
-    from server.src.parse_event_logs import insert_rows, parse_records
+from vex_agent.fetch_invite_hub_logs import (
+    DEFAULT_BASE_URL,
+    DEFAULT_PAGE_SIZE,
+    DEFAULT_STATE_PATH,
+    build_query_string,
+    clear_cached_token,
+    fetch_vex_logs_incremental,
+    get_auth_token,
+    load_local_env,
+    parse_source_log_id,
+    parse_event_time,
+    read_sync_state,
+    write_sync_state,
+)
+from vex_agent.parse_event_logs import insert_rows, parse_records
 
 
 def sync_invite_hub_logs(*, student_id: str | None = None) -> int:

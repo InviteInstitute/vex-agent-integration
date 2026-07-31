@@ -7,11 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-from src.routes.students import router as students_router
-from src.routes.admin import router as admin_router
-from src.routes.stream import router as stream_router
-from src.trigger_daemon import start_daemon, stop_daemon
-from src.turnstile import (
+from vex_agent.routes.students import router as students_router
+from vex_agent.routes.admin import router as admin_router
+from vex_agent.routes.stream import router as stream_router
+from vex_agent.trigger_daemon import start_daemon, stop_daemon
+from vex_agent.turnstile import (
     TurnstileGateMiddleware, COOKIE_NAME, COOKIE_MAX_AGE, sign_cookie, verify_turnstile,
 )
 

@@ -60,7 +60,7 @@ TRIGGER_POLL_INTERVAL_S=5
    - create a repo root `.env` from [.env.example](/Users/tiffanyvuu/Documents/College/Semester8/CIS4914/senior-project/.env.example), or export the backend env vars
    - `cd server`
    - `source .venv/bin/activate`
-   - `uvicorn src.app:app --reload --log-level info`
+   - `uvicorn vex_agent.app:app --reload --log-level info`
 
 ## Local DB Setup (Team Workflow)
 
@@ -200,7 +200,7 @@ pip install -r requirements.txt
 Start command:
 
 ```bash
-uvicorn src.app:app --host 0.0.0.0 --port $PORT
+uvicorn vex_agent.app:app --host 0.0.0.0 --port $PORT
 ```
 
 Environment variables:

@@ -32,7 +32,7 @@ case "${OPENAI_BASE_URL:-}${OPENAI_API_KEY:-}" in
     ;;
 esac
 
-( cd "$ROOT/server" && nohup "$ROOT/.venv/bin/python" -m uvicorn src.app:app \
+( cd "$ROOT/server" && nohup "$ROOT/.venv/bin/python" -m uvicorn vex_agent.app:app \
     --host 127.0.0.1 --port "$BACKEND_PORT" >"$RUN/backend.log" 2>&1 & )
 ( cd "$ROOT/client" && nohup npm run dev -- --host 127.0.0.1 --port "$FRONTEND_PORT" \
     >"$RUN/frontend.log" 2>&1 & )

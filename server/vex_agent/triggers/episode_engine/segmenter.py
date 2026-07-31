@@ -19,7 +19,7 @@ segment_episodes output:
   start_ts, end_ts, event_count, soft_indices}, where start_idx is inclusive and
   end_idx is exclusive (Caitlin's repo convention).
 """
-from src.triggers.constants import (
+from vex_agent.triggers.constants import (
     boundary_kind,
     SOFT_EVENT_TYPES,
     PAUSE_THRESHOLD_S,

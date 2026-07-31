@@ -1,7 +1,7 @@
 """Tests for the daemon scope (now: every student with telemetry). All monkeypatched --
 no DB, no Ollama, no prod. The properties (scope is all_students, no prod hit when there
 is no telemetry) are the point."""
-from src import trigger_daemon as td
+from vex_agent import trigger_daemon as td
 
 
 def test_daemon_disabled_by_default(monkeypatch):
