@@ -4,7 +4,8 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException
 
-from vex_agent.domain.block_catalog import resolve_available_blocks
+from vex_agent.config import DEFAULT_PLAYGROUND
+from vex_agent.domain.catalogs import resolve_available_blocks
 from vex_agent.domain.metrics import (
     compute_snapshot_for_student_session,
     has_active_project_run,
@@ -35,11 +36,10 @@ from vex_agent.api.schemas import (
     StudentResponseResponse,
 )
 from vex_agent.services.sessions import append_session_message, get_recent_session_messages
-from vex_agent.domain.task_catalog import resolve_task_description
+from vex_agent.domain.catalogs import resolve_task_description
 
 router = APIRouter(prefix="/v1", tags=["students"])
 logger = logging.getLogger(__name__)
-DEFAULT_PLAYGROUND = "GO-Mars"
 SESSION_CACHE_TTL_S = 60.0
 SYNC_COOLDOWN_S = 15.0
 ACTIVE_RUN_MESSAGE = (

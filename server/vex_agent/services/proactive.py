@@ -7,6 +7,7 @@ import os
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
+from vex_agent.config import DEFAULT_PLAYGROUND
 from vex_agent.domain.metrics import EventRecord
 from vex_agent.data.db import fetch_events_from_db
 from vex_agent.domain.context_builder import (
@@ -22,12 +23,10 @@ from vex_agent.data.db import (
     latest_inactive_trigger, resolve_open_inactive_triggers,
 )
 from vex_agent.domain.feedback_policy import FeedbackClass
-from vex_agent.domain.task_catalog import resolve_task_description
-from vex_agent.domain.block_catalog import resolve_available_blocks
+from vex_agent.domain.catalogs import resolve_task_description, resolve_available_blocks
 from vex_agent.services.sessions import get_recent_session_messages, append_session_message
 from vex_agent.llm.client import generate_robot_behavior_summary, generate_main_llm_response
 
-DEFAULT_PLAYGROUND = "GO-Mars"
 
 # Seed table (from the spike). Only wheel_spin is ACTED on in v1; the rest are
 # seeded so graduating them later (issues #13/#14) is a one-line change.
