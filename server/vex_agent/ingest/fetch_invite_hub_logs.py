@@ -375,7 +375,7 @@ def count_download_records(text: str) -> int:
 
 
 def load_parse_helpers() -> tuple[Any, Any, Any]:
-    from vex_agent.parse_event_logs import insert_rows, parse_records, parse_text_blob
+    from vex_agent.ingest.parse_event_logs import insert_rows, parse_records, parse_text_blob
 
     return insert_rows, parse_records, parse_text_blob
 

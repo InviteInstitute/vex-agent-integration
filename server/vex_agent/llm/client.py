@@ -5,12 +5,12 @@ from pathlib import Path
 
 import openai
 
-from vex_agent.context_builder import (
+from vex_agent.domain.context_builder import (
     build_feedback_prompt_from_classes,
     build_robot_behavior_prompt,
 )
-from vex_agent.feedback_policy import FeedbackClass
-from vex_agent.output_sanitizer import sanitize_llm_output
+from vex_agent.domain.feedback_policy import FeedbackClass
+from vex_agent.llm.sanitizer import sanitize_llm_output
 from vex_agent.settings import get_navigator_model
 
 DEFAULT_LLM_TIMEOUT_S = 30.0

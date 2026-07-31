@@ -1,8 +1,8 @@
 """Trigger-graduation tests (#13 resilience+inactive, #14 explorer+iterative)."""
 from datetime import datetime, timedelta, timezone
 
-from vex_agent.trigger_service import ACTED_TRIGGERS, feedback_classes_for_trigger, is_inactive
-from vex_agent.feedback_policy import FeedbackClass
+from vex_agent.services.proactive import ACTED_TRIGGERS, feedback_classes_for_trigger, is_inactive
+from vex_agent.domain.feedback_policy import FeedbackClass
 from vex_agent.triggers.constants import INACTIVE_TRIGGER_SECONDS
 
 

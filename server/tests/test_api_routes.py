@@ -12,7 +12,7 @@ def test_health():
 
 
 def test_admin_tick_endpoint(monkeypatch):
-    import vex_agent.routes.admin as admin
+    import vex_agent.api.admin as admin
     from vex_agent.app import app
 
     monkeypatch.setattr(

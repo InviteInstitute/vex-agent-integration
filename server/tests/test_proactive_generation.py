@@ -1,10 +1,10 @@
 """Pure tests for proactive generation mapping + anti-leak (issue #6). The full
 LLM generation is verified separately against Ollama (needs a model + DB)."""
-from vex_agent.trigger_service import (
+from vex_agent.services.proactive import (
     feedback_classes_for_trigger, generate_proactive_response,
     _NEUTRAL_FACT, ACTED_TRIGGERS, disabled_trigger_types,
 )
-from vex_agent.feedback_policy import FeedbackClass
+from vex_agent.domain.feedback_policy import FeedbackClass
 
 
 def test_wheel_spin_maps_to_reassure_diagnose():

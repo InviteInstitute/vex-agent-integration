@@ -1,11 +1,11 @@
-from vex_agent.current_state_metrics import (
+from vex_agent.domain.metrics import (
     ActionLevel,
     CognitionCategory,
     CurrentStateSnapshot,
     Direction,
     PersistenceCategory,
 )
-from vex_agent.feedback_policy import FeedbackClass, determine_feedback_class
+from vex_agent.domain.feedback_policy import FeedbackClass, determine_feedback_class
 
 
 def make_snapshot(

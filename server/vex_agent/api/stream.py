@@ -12,7 +12,7 @@ import json
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from vex_agent.db import (
+from vex_agent.data.db import (
     latest_proactive_message_id, get_proactive_messages_after, proactive_rev,
 )
 

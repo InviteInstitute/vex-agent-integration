@@ -8,7 +8,7 @@ from pathlib import Path
 # skipped; the last_source_log_id filter drops the re-fetched duplicates.
 SYNC_OVERLAP_SECONDS = 2
 
-from vex_agent.fetch_invite_hub_logs import (
+from vex_agent.ingest.fetch_invite_hub_logs import (
     DEFAULT_BASE_URL,
     DEFAULT_PAGE_SIZE,
     DEFAULT_STATE_PATH,
@@ -22,7 +22,7 @@ from vex_agent.fetch_invite_hub_logs import (
     read_sync_state,
     write_sync_state,
 )
-from vex_agent.parse_event_logs import insert_rows, parse_records
+from vex_agent.ingest.parse_event_logs import insert_rows, parse_records
 
 
 def sync_invite_hub_logs(*, student_id: str | None = None) -> int:

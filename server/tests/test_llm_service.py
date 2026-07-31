@@ -1,7 +1,7 @@
 """Covers llm_service without Ollama: credential loading, the OpenAI client call
 (mocked), length enforcement, and the sanitized generate path."""
-from vex_agent import llm_service as ls
-from vex_agent.feedback_policy import FeedbackClass
+from vex_agent.llm import client as ls
+from vex_agent.domain.feedback_policy import FeedbackClass
 
 
 def test_load_navigator_credentials_from_env(monkeypatch):

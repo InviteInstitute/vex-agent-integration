@@ -1,6 +1,6 @@
 """Covers the generate_proactive_response LLM path and run_proactive_tick's
 non-acted branch (the lines the pure/DB tests don't reach), all mocked."""
-from vex_agent import trigger_service as ts
+from vex_agent.services import proactive as ts
 
 
 def test_generate_proactive_response_full_path(monkeypatch):

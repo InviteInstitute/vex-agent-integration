@@ -22,8 +22,8 @@ dependencies = [
 dev = ["pytest==8.4.2"]
 
 [project.scripts]
-vex-parse-logs = "vex_agent.parse_event_logs:main"
-vex-fetch-logs = "vex_agent.fetch_invite_hub_logs:main"
+vex-parse-logs = "vex_agent.ingest.parse_event_logs:main"
+vex-fetch-logs = "vex_agent.ingest.fetch_invite_hub_logs:main"
 
 [tool.setuptools.packages.find]
 include = ["vex_agent*"]

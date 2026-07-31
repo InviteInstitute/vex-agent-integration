@@ -4,8 +4,8 @@ Run from server/:  PYTHONPATH=. ../.venv/bin/python -m pytest tests/test_trigger
 """
 from datetime import datetime, timezone
 
-from vex_agent.current_state_metrics import EventRecord
-from vex_agent.trigger_service import compute_run_distances
+from vex_agent.domain.metrics import EventRecord
+from vex_agent.services.proactive import compute_run_distances
 
 XMLNS = 'xmlns="https://developers.google.com/blockly/xml"'
 WS_A = f'<xml {XMLNS}><block type="pg_events_when_started" id="s"></block></xml>'
@@ -56,7 +56,7 @@ def test_playground_switch_resets_distance_to_none():
 
 def test_run_cache_skips_recompute_on_signature_match(monkeypatch):
     # the cached path must return the same sequence without re-running APTED
-    from vex_agent import trigger_service as ts
+    from vex_agent.services import proactive as ts
 
     events = [_run(WS_A, 0), _run(WS_B, 1)]
     calls = {"compute": 0}
@@ -77,7 +77,7 @@ def test_run_cache_skips_recompute_on_signature_match(monkeypatch):
 
 
 def test_run_cache_invalidates_when_events_grow(monkeypatch):
-    from vex_agent import trigger_service as ts
+    from vex_agent.services import proactive as ts
 
     ev1 = [_run(WS_A, 0)]
     ev2 = [_run(WS_A, 0), _run(WS_B, 1)]

@@ -7,22 +7,25 @@ import os
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from vex_agent.current_state_metrics import (
-    EventRecord, fetch_events_from_db, build_raw_logs_context, build_current_program,
+from vex_agent.domain.metrics import EventRecord
+from vex_agent.data.db import fetch_events_from_db
+from vex_agent.domain.context_builder import (
+    build_raw_logs_context,
+    build_current_program,
     build_episode_summary,
 )
 from vex_agent.triggers.run_sequence import compute_run_edit_distances
 from vex_agent.triggers.detectors import detect_run_triggers_by_playground
 from vex_agent.triggers.constants import INACTIVE_TRIGGER_SECONDS, RE_ALERT_SECONDS, TRIGGER_LABELS
-from vex_agent.db import (
+from vex_agent.data.db import (
     insert_agent_trigger_if_new, insert_message, mark_agent_trigger_acted,
     latest_inactive_trigger, resolve_open_inactive_triggers,
 )
-from vex_agent.feedback_policy import FeedbackClass
-from vex_agent.task_catalog import resolve_task_description
-from vex_agent.block_catalog import resolve_available_blocks
-from vex_agent.session_service import get_recent_session_messages, append_session_message
-from vex_agent.llm_service import generate_robot_behavior_summary, generate_main_llm_response
+from vex_agent.domain.feedback_policy import FeedbackClass
+from vex_agent.domain.task_catalog import resolve_task_description
+from vex_agent.domain.block_catalog import resolve_available_blocks
+from vex_agent.services.sessions import get_recent_session_messages, append_session_message
+from vex_agent.llm.client import generate_robot_behavior_summary, generate_main_llm_response
 
 DEFAULT_PLAYGROUND = "GO-Mars"
 

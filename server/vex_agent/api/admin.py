@@ -4,7 +4,7 @@ real sessions before the always-on daemon (#11) exists."""
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from vex_agent.trigger_service import run_proactive_tick
+from vex_agent.services.proactive import run_proactive_tick
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 

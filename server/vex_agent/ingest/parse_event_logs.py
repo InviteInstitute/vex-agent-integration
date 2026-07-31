@@ -7,7 +7,7 @@ from typing import Any
 
 from psycopg.types.json import Json
 
-from vex_agent.db import get_conn
+from vex_agent.data.db import get_conn
 
 
 _last_skip_summary: dict[str, int] = {}

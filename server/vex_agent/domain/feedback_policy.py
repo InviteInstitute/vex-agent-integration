@@ -4,7 +4,7 @@ Feedback Policy
 
 from enum import Enum
 
-from vex_agent.current_state_metrics import CurrentStateSnapshot
+from vex_agent.domain.metrics import CurrentStateSnapshot
 
 
 class FeedbackClass(Enum):

@@ -1,10 +1,21 @@
 import os
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import psycopg
+from psycopg.rows import dict_row
 from psycopg.types.json import Json
 from dotenv import load_dotenv
+
+# Domain models + pure mappers this data layer returns/persists (one-way data -> domain;
+# metrics has no app-level top-level imports, so this can't cycle at import time).
+from vex_agent.domain.metrics import (
+    CurrentStateSnapshot,
+    EventRecord,
+    canonical_playground_from_payload,
+    parse_dt,
+)
 
 load_dotenv()  # once at import, not on every query
 
@@ -302,3 +313,99 @@ def proactive_rev() -> int:
             cur.execute("SELECT rev FROM chat.channel_rev WHERE channel = 'proactive'")
             row = cur.fetchone()
             return row[0] if row else 0
+
+
+def to_event_record(row: dict[str, Any]) -> EventRecord:
+    playground_data_json = (
+        row.get("playground_data_json") if isinstance(row.get("playground_data_json"), dict) else None
+    )
+    return EventRecord(
+        id=row.get("id"),
+        session_id=str(row["session_id"]),
+        student_id=str(row["student_id"]),
+        event_ts=parse_dt(row["event_ts"]),
+        event_type=str(row["event_type"]),
+        playground=canonical_playground_from_payload(
+            row.get("playground"),
+            row.get("project_json"),
+            playground_data_json,
+        ),
+        project_json=row.get("project_json") if isinstance(row.get("project_json"), dict) else None,
+        block_event_data_json=row.get("block_event_data_json")
+        if isinstance(row.get("block_event_data_json"), dict)
+        else None,
+        playground_data_json=playground_data_json,
+        error_message=row.get("error_message"),
+    )
+
+
+def fetch_events_from_db(student_id: str, session_id: str) -> list[EventRecord]:
+    sql = """
+    SELECT
+        id,
+        session_id,
+        student_id,
+        event_ts,
+        event_type,
+        playground,
+        project_json,
+        block_event_data_json,
+        playground_data_json,
+        error_message
+    FROM event_logs.parsed_events
+    WHERE student_id = %(student_id)s
+      AND session_id = %(session_id)s
+    ORDER BY event_ts, id
+    """
+    with get_conn() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(sql, {"student_id": student_id, "session_id": session_id})
+            rows = cur.fetchall()
+    events = [to_event_record(dict(row)) for row in rows]
+    return [event for event in events if event.playground is not None]
+
+
+def upsert_snapshot(snapshot: CurrentStateSnapshot) -> None:
+    sql = """
+    INSERT INTO current_state.state_snapshots (
+        session_id,
+        student_id,
+        time_on_task_s,
+        action_level,
+        progress_pct,
+        direction,
+        cognition,
+        persistence,
+        computed_from_event_id_min,
+        computed_from_event_id_max,
+        created_at
+    )
+    VALUES (
+        %(session_id)s,
+        %(student_id)s,
+        %(time_on_task_s)s,
+        %(action_level)s,
+        %(progress_pct)s,
+        %(direction)s,
+        %(cognition)s,
+        %(persistence)s,
+        %(computed_from_event_id_min)s,
+        %(computed_from_event_id_max)s,
+        %(created_at)s
+    )
+    ON CONFLICT (session_id, student_id)
+    DO UPDATE SET
+        time_on_task_s = EXCLUDED.time_on_task_s,
+        action_level = EXCLUDED.action_level,
+        progress_pct = EXCLUDED.progress_pct,
+        direction = EXCLUDED.direction,
+        cognition = EXCLUDED.cognition,
+        persistence = EXCLUDED.persistence,
+        computed_from_event_id_min = EXCLUDED.computed_from_event_id_min,
+        computed_from_event_id_max = EXCLUDED.computed_from_event_id_max,
+        created_at = EXCLUDED.created_at
+    """
+    payload = snapshot.to_dict()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, payload)

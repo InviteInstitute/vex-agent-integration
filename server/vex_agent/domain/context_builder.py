@@ -2,10 +2,14 @@
 Context Builder
 """
 
+import json
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import List
 
-from vex_agent.feedback_policy import FeedbackClass
+from vex_agent.domain.feedback_policy import FeedbackClass
+from vex_agent.domain.metrics import EventRecord, segment_episodes_for_events
+from vex_agent.data.db import fetch_events_from_db
 
 @dataclass
 class FeedbackSpec:
@@ -431,3 +435,113 @@ def build_robot_behavior_prompt(task: str, raw_logs: str) -> str:
     return ROBOT_BEHAVIOR_PROMPT_TEMPLATE.format(
         raw_logs=raw_logs,
     )
+
+
+def build_raw_logs_context(
+    student_id: str,
+    session_id: str,
+    *,
+    limit: int = 50,
+) -> str:
+    events = fetch_events_from_db(student_id=student_id, session_id=session_id)
+    if not events:
+        return "None"
+
+    selected_events = events[-limit:]
+    lines: list[str] = []
+    for event in selected_events:
+        lines.append(
+            json.dumps(
+                {
+                    "event_ts": event.event_ts.isoformat(),
+                    "event_type": event.event_type,
+                    "playground": event.playground,
+                    "block_event_data": event.block_event_data_json,
+                    "playground_data": event.playground_data_json,
+                    "error_message": event.error_message,
+                },
+                ensure_ascii=True,
+            )
+        )
+    return "\n".join(lines)
+
+
+def build_current_program(
+    student_id: str,
+    session_id: str,
+    *,
+    events: list[EventRecord] | None = None,
+) -> str:
+    """Render the student's current workspace as compact pseudo-code for the LLM,
+    via the vendored smart_delta engine ([Active]/[Orphaned] tree with fields).
+
+    Grounds the feedback in the student's ACTUAL code (not just the block catalog
+    or a raw-log dump) -- directly addresses the spike's "hallucination from thin
+    grounding" learning (design doc §9). Falls back to humanize's readable listing
+    (with parameter values) when smart_delta yields nothing. Returns "" when no
+    project snapshot exists.
+
+    Pass `events` to skip a redundant DB fetch (the reactive route already has them)."""
+    from vex_agent.triggers.smart_delta import generate_llm_prompt_from_project
+    from vex_agent.triggers.humanize import humanize_text
+    from vex_agent.triggers.ast_builder import extract_workspace_xml
+
+    if events is None:
+        events = fetch_events_from_db(student_id=student_id, session_id=session_id)
+    if not events:
+        return ""
+
+    # The latest runProject carries the most recent full workspace. Fall back to the
+    # latest event with a project_json if no runProject is present.
+    latest_project = None
+    for event in reversed(events):
+        if event.event_type == "runProject" and event.project_json:
+            latest_project = event.project_json
+            break
+    if latest_project is None:
+        for event in reversed(events):
+            if event.project_json:
+                latest_project = event.project_json
+                break
+    if not latest_project:
+        return ""
+
+    # smart_delta's bootstrap accepts a project dict (it json.loads strings, passes
+    # dicts through). Prefer its [Active]/[Orphaned] render; fall back to humanize's
+    # readable listing (which keeps <value> parameter numbers smart_delta drops).
+    prompt = generate_llm_prompt_from_project(
+        json.dumps(latest_project) if not isinstance(latest_project, str) else latest_project
+    )
+    if prompt:
+        return prompt
+
+    workspace_xml = extract_workspace_xml({"project": latest_project})
+    return humanize_text(workspace_xml)
+
+
+def build_episode_summary(
+    student_id: str,
+    session_id: str,
+    *,
+    events: list[EventRecord] | None = None,
+) -> str:
+    """A compact one-line-per-episode behavioral timeline for the LLM: what the
+    student did (CODE/RUN/RESET) and where they paused (post-run-watching vs idle).
+    Empty string when there's nothing to segment. Pass `events` to skip a DB fetch."""
+    if events is None:
+        events = fetch_events_from_db(student_id=student_id, session_id=session_id)
+    if not events:
+        return ""
+    episodes, pauses = segment_episodes_for_events(events)
+    if not episodes:
+        return ""
+    counts: Counter = Counter(ep["episode_type"] for ep in episodes)
+    parts = [f"{count} {kind}" for kind, count in counts.items()]
+    line = "Activity timeline: " + ", ".join(parts) + "."
+    post_run = [p for p in pauses if p["episode_type"] == "POST_RUN_PAUSE"]
+    inactive = [p for p in pauses if p["episode_type"] == "INACTIVE_PAUSE"]
+    if post_run:
+        line += f" {len(post_run)} post-run pause(s) (student watched their result)."
+    if inactive:
+        line += f" {len(inactive)} long idle gap(s)."
+    return line
