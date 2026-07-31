@@ -43,3 +43,46 @@ def test_insert_dedupes_on_run_index():
                     "DELETE FROM event_logs.agent_triggers WHERE student_id = %s",
                     (student_id,),
                 )
+
+
+def test_latest_inactive_and_resolve_lifecycle():
+    # the re-alert lifecycle: latest_inactive_trigger finds the most recent fire,
+    # resolve_open_inactive_triggers closes open ones when the student recovers.
+    from src.db import (
+        insert_agent_trigger_if_new, latest_inactive_trigger,
+        resolve_open_inactive_triggers, get_conn,
+    )
+
+    session_id = str(uuid4())
+    student_id = f"test_{uuid4().hex[:8]}"
+    try:
+        # first inactive fire at run_index -1
+        assert latest_inactive_trigger(student_id, session_id) is None
+        insert_agent_trigger_if_new(
+            student_id=student_id, session_id=session_id,
+            trigger_type="inactive", run_index=-1, detail={"value": "idle 5m"},
+        )
+        row = latest_inactive_trigger(student_id, session_id)
+        assert row is not None and row[0] == -1
+
+        # re-alert at run_index -2 (a distinct dedupe key, so it inserts)
+        second = insert_agent_trigger_if_new(
+            student_id=student_id, session_id=session_id,
+            trigger_type="inactive", run_index=-2, detail={"value": "idle 15m"},
+        )
+        assert second is not None
+        row = latest_inactive_trigger(student_id, session_id)
+        assert row[0] == -2  # the most recent fire
+
+        # student recovers -> resolve all open inactive triggers
+        resolved = resolve_open_inactive_triggers(student_id, session_id)
+        assert resolved == 2  # both -1 and -2 were open
+        # resolving again is a no-op (nothing open)
+        assert resolve_open_inactive_triggers(student_id, session_id) == 0
+    finally:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM event_logs.agent_triggers WHERE student_id = %s",
+                    (student_id,),
+                )

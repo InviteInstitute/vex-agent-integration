@@ -24,7 +24,7 @@ from src.block_catalog import resolve_available_blocks
 WHEEL_SPIN_ZERO_RUNS = 6
 RESILIENCE_ZERO_RUNS = 4
 EXPLORER_EDIT_DISTANCE = 13
-ITERATIVE_EDIT_MIN = 1
+ITERATIVE_EDIT_MIN = 0
 ITERATIVE_DEFAULT_THRESHOLD = 6
 LABELS = {
     "wheel_spin": "Wheel-spinning", "resilience": "Resilience", "inactive": "Inactive",

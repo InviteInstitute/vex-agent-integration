@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from uuid import UUID
 
 import psycopg
@@ -6,6 +7,13 @@ from psycopg.types.json import Json
 from dotenv import load_dotenv
 
 load_dotenv()  # once at import, not on every query
+
+
+def canon_id(sid: str | None) -> str:
+    """Canonical identity key for a studentID: whitespace- and case-folded (ported
+    from lm-dashboard). studentIDs are handles sometimes typed in different casing
+    (cobra3 vs Cobra3); folding here makes the system treat those spellings as one."""
+    return (sid or "").strip().lower()
 
 
 def get_conn() -> psycopg.Connection:
@@ -57,6 +65,46 @@ def mark_agent_trigger_acted(*, trigger_id: int, response_id: UUID) -> None:
                 """,
                 (response_id, trigger_id),
             )
+
+
+def latest_inactive_trigger(student_id: str, session_id: str) -> tuple[int, datetime] | None:
+    """The most recent inactive trigger row for a session: (run_index, fired_at).
+    Used by the re-alert logic to decide whether a new inactive fire is due yet
+    (RE_ALERT_SECONDS since fired_at) or should be suppressed. Returns None when
+    the session has never had an inactive fire."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT run_index, fired_at
+                FROM event_logs.agent_triggers
+                WHERE student_id = %s AND session_id = %s AND trigger_type = 'inactive'
+                ORDER BY fired_at DESC, id DESC
+                LIMIT 1
+                """,
+                (student_id, session_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return (row[0], row[1])
+
+
+def resolve_open_inactive_triggers(student_id: str, session_id: str) -> int:
+    """Close every open (resolved_at IS NULL) inactive trigger for a session. Called
+    when the student is no longer idle (they recovered). Returns the count resolved."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE event_logs.agent_triggers
+                SET resolved_at = NOW()
+                WHERE student_id = %s AND session_id = %s
+                  AND trigger_type = 'inactive' AND resolved_at IS NULL
+                """,
+                (student_id, session_id),
+            )
+            return cur.rowcount
 
 
 def insert_message(
@@ -202,12 +250,55 @@ def get_proactive_messages_after(student_id: str, after_id: int) -> list[dict]:
             ]
 
 
-def all_students() -> list[str]:
+def all_students(recency_hours: float | None = None) -> list[str]:
     """Every student the agent has telemetry for -- the daemon's scope when it runs
     for everyone (not just the chat roster). Sourced from synced parsed_events.
-    ponytail: all-time; add a `WHERE event_ts > NOW() - INTERVAL '1 day'` window if
-    the daemon should only chase currently-active students, not every historical id."""
+
+    recency_hours: when set, only students with an event within the last N hours
+    are returned. This bounds the daemon's first-tick blast radius (spec §8). The
+    daemon passes TRIGGER_STUDENT_RECENCY_HOURS (default 24); pass None for the
+    all-time view.
+
+    Returns DISTINCT spellings as stored (NOT case-folded) so each casing variant
+    the daemon sees maps back to the same student_id rows. Use canon_id() to fold
+    when you need one key per student."""
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT DISTINCT student_id FROM event_logs.parsed_events")
+            if recency_hours is not None:
+                cur.execute(
+                    "SELECT DISTINCT student_id FROM event_logs.parsed_events "
+                    "WHERE event_ts > NOW() - (%s * INTERVAL '1 hour')",
+                    (recency_hours,),
+                )
+            else:
+                cur.execute("SELECT DISTINCT student_id FROM event_logs.parsed_events")
             return [row[0] for row in cur.fetchall()]
+
+
+def record_switch(
+    *, student_id: str, session_id: str, switch_kind: str, from_value: str | None, to_value: str | None,
+) -> None:
+    """Persist an identity switch (casing flip or classCode change) to switch_events.
+    Vendored table from lm-dashboard; additive -- the agent does not act on this yet,
+    but researchers can query the log."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO event_logs.switch_events
+                    (student_id, session_id, switch_kind, from_value, to_value)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (student_id, session_id, switch_kind, from_value, to_value),
+            )
+
+
+def proactive_rev() -> int:
+    """The current revision counter for the 'proactive' channel (O(1) read). The SSE
+    stream uses this as a cheap "did anything change?" gate before polling
+    chat.messages. Vendored from lm-dashboard's channel_rev pattern."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT rev FROM chat.channel_rev WHERE channel = 'proactive'")
+            row = cur.fetchone()
+            return row[0] if row else 0

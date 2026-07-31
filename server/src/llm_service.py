@@ -17,12 +17,19 @@ DEFAULT_LLM_TIMEOUT_S = 30.0
 MAX_STUDENT_RESPONSE_SENTENCES = 1
 MAX_STUDENT_RESPONSE_WORDS = 22
 SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+")
+# Buffer above MAX_STUDENT_RESPONSE_WORDS (~1.3 tokens/word). Generous on purpose:
+# a long `block name` in backticks can eat 20+ tokens on its own, and a cap that's
+# too tight truncates the model mid-word instead of mid-generation-savings.
+MAIN_RESPONSE_MAX_TOKENS = 160
+
+_client: openai.OpenAI | None = None
 
 
 def prepare_main_llm_request(
     task: str,
     student_message: str,
     available_blocks: list[str] | None,
+    current_program: str,
     robot_behavior_summary: str,
     recent_messages: list[dict[str, str]],
     feedback_classes: set[FeedbackClass],
@@ -31,6 +38,7 @@ def prepare_main_llm_request(
         task=task,
         student_message=student_message,
         available_blocks=available_blocks,
+        current_program=current_program,
         robot_behavior_summary=robot_behavior_summary,
         recent_messages=recent_messages,
         feedback_classes=feedback_classes,
@@ -69,8 +77,25 @@ def create_openai_client() -> openai.OpenAI:
     )
 
 
-def execute_prompt(*, model: str, prompt: str) -> str:
-    client = create_openai_client()
+def get_openai_client() -> openai.OpenAI:
+    """Lazily-created, process-wide client so back-to-back calls (robot-behavior
+    summary, then main response) reuse one warm connection instead of each paying
+    a fresh TCP+TLS handshake to the LLM endpoint."""
+    global _client
+    if _client is None:
+        _client = create_openai_client()
+    return _client
+
+
+def clear_client_cache() -> None:
+    """Drop the cached client. Test hook (conftest calls it between tests)."""
+    global _client
+    _client = None
+
+
+def execute_prompt(*, model: str, prompt: str, max_tokens: int | None = None) -> str:
+    client = get_openai_client()
+    kwargs = {"max_tokens": max_tokens} if max_tokens is not None else {}
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -79,6 +104,7 @@ def execute_prompt(*, model: str, prompt: str) -> str:
                 "content": prompt,
             }
         ],
+        **kwargs,
     )
     return response.choices[0].message.content
 
@@ -125,6 +151,7 @@ def generate_main_llm_response(
     task: str,
     student_message: str,
     available_blocks: list[str] | None,
+    current_program: str,
     robot_behavior_summary: str,
     recent_messages: list[dict[str, str]],
     feedback_classes: set[FeedbackClass],
@@ -133,6 +160,7 @@ def generate_main_llm_response(
         task=task,
         student_message=student_message,
         available_blocks=available_blocks,
+        current_program=current_program,
         robot_behavior_summary=robot_behavior_summary,
         recent_messages=recent_messages,
         feedback_classes=feedback_classes,
@@ -140,6 +168,7 @@ def generate_main_llm_response(
     response_text = execute_prompt(
         model=llm_request["model"],
         prompt=llm_request["prompt"],
+        max_tokens=MAIN_RESPONSE_MAX_TOKENS,
     )
     response_text = enforce_student_response_length(sanitize_llm_output(response_text))
     return {

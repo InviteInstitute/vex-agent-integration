@@ -115,11 +115,29 @@ def request_json(
         raise RuntimeError(f"{method} {url} returned invalid JSON") from exc
 
 
+# DRF TokenAuthentication issues a static key, not a short-lived JWT, so it's
+# safe to hold onto for the life of the process instead of re-logging-in on every
+# sync_invite_hub_logs() call (which was costing ~0.84s of login handshake on
+# every single reactive chat message). Cleared and re-fetched only if the Hub
+# ever actually rejects it (see log_sync.py's retry-once-on-401/403).
+_cached_token: str | None = None
+
+
+def clear_cached_token() -> None:
+    """Drop the cached Invite Hub token. Test hook / forces a fresh login."""
+    global _cached_token
+    _cached_token = None
+
+
 def get_auth_token(base_url: str) -> str:
     env_token = os.getenv("INVITE_HUB_TOKEN")
     if env_token:
         print("[fetch_invite_hub_logs] Using INVITE_HUB_TOKEN from environment.", flush=True)
         return env_token
+
+    global _cached_token
+    if _cached_token is not None:
+        return _cached_token
 
     username = os.getenv("INVITE_HUB_USERNAME")
     password = os.getenv("INVITE_HUB_PASSWORD")
@@ -136,6 +154,7 @@ def get_auth_token(base_url: str) -> str:
     token = payload.get("token") if isinstance(payload, dict) else None
     if not isinstance(token, str) or not token:
         raise RuntimeError("Invite Hub login succeeded but no token was returned.")
+    _cached_token = token
     return token
 
 

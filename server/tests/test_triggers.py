@@ -64,3 +64,34 @@ def test_by_playground_resets_counters_on_switch():
     runs = ([{"index": i, "edit_distance": 0, "ts": None, "playground": "A"} for i in range(3)]
             + [{"index": i + 3, "edit_distance": 0, "ts": None, "playground": "B"} for i in range(3)])
     assert "wheel_spin" not in [t[0] for t in detect_run_triggers_by_playground(runs)]
+
+
+def test_iterative_counts_distance_one():
+    # A single-block edit (edit_distance == 1) counts toward Step-by-Step
+    # (ITERATIVE_EDIT_MIN = 0, synced with lm-dashboard), so six of them reach
+    # the default threshold. Regression guard: the vendored copy was stale at 1.
+    seq = [None, 1, 1, 1, 1, 1, 1, 1]
+    fired = detect_run_triggers(seq)
+    assert any(t == "iterative" and i == 6 for t, i, _ in fired)
+
+
+def test_iterative_fires_at_threshold_then_cooldown_until_zero():
+    # six runs of edit_distance > 0 -> fires at the 6th; then needs a 0 to re-arm
+    seq = [None, 2, 2, 2, 2, 2, 2, 2, 0, 3, 3, 3, 3, 3, 3]
+    fired = [i for t, i, _ in detect_run_triggers(seq) if t == "iterative"]
+    assert fired == [6, 14]
+
+
+def test_wheel_spin_and_resilience_both_fire_on_long_then_edit():
+    seq = [None, 0, 0, 0, 0, 0, 0, 0, 1]  # 7 zeros then an edit
+    fired = [(t, i) for t, i, _ in detect_run_triggers(seq)]
+    assert ("wheel_spin", 6) in fired and ("resilience", 8) in fired
+
+
+def test_by_playground_uses_per_playground_iterative_threshold():
+    # RoverRescue needs only 3 steady edits (vs the default 6); CastleCrasherPlus 6.
+    base = {"index": 0, "edit_distance": 1, "ts": None}
+    rover = [{**base, "index": i, "playground": "RoverRescue"} for i in range(3)]
+    assert any(t == "iterative" for t, _, _ in detect_run_triggers_by_playground(rover))
+    castle = [{**base, "index": i, "playground": "CastleCrasherPlus"} for i in range(3)]
+    assert not any(t == "iterative" for t, _, _ in detect_run_triggers_by_playground(castle))

@@ -6,7 +6,7 @@ only; the DB-coupled sustained `inactive` sweep lives in a later slice).
                same code); silent until a real edit re-arms it.
   resilience : a real edit right after >= RESILIENCE_ZERO_RUNS zeros (recovered).
   explorer   : a single run with edit_distance >= EXPLORER_EDIT_DISTANCE.
-  iterative  : ITERATIVE_DEFAULT_THRESHOLD runs with edit_distance > 1 (steady edits).
+  iterative  : ITERATIVE_DEFAULT_THRESHOLD runs with edit_distance > 0 (steady edits).
 """
 from src.triggers.constants import (
     WHEEL_SPIN_ZERO_RUNS, RESILIENCE_ZERO_RUNS, EXPLORER_EDIT_DISTANCE,

@@ -14,6 +14,7 @@ try:
         DEFAULT_PAGE_SIZE,
         DEFAULT_STATE_PATH,
         build_query_string,
+        clear_cached_token,
         fetch_vex_logs_incremental,
         get_auth_token,
         load_local_env,
@@ -29,6 +30,7 @@ except ModuleNotFoundError:
         DEFAULT_PAGE_SIZE,
         DEFAULT_STATE_PATH,
         build_query_string,
+        clear_cached_token,
         fetch_vex_logs_incremental,
         get_auth_token,
         load_local_env,
@@ -58,14 +60,23 @@ def sync_invite_hub_logs(*, student_id: str | None = None) -> int:
         cursor = datetime.fromisoformat(last_event_time) - timedelta(seconds=SYNC_OVERLAP_SECONDS)
         date_from = cursor.isoformat()
 
-    raw_records = fetch_vex_logs_incremental(
-        base_url,
-        token,
-        build_query_string(student_id=student_id),
-        page_size=DEFAULT_PAGE_SIZE,
-        last_source_log_id=last_source_log_id,
-        date_from=date_from,
-    )
+    query_string = build_query_string(student_id=student_id)
+    try:
+        raw_records = fetch_vex_logs_incremental(
+            base_url, token, query_string,
+            page_size=DEFAULT_PAGE_SIZE, last_source_log_id=last_source_log_id, date_from=date_from,
+        )
+    except RuntimeError as exc:
+        # The cached token (get_auth_token) is a static key reused across calls;
+        # if the Hub ever actually rejects it, drop the cache and log in fresh once.
+        if "HTTP 401" not in str(exc) and "HTTP 403" not in str(exc):
+            raise
+        clear_cached_token()
+        token = get_auth_token(base_url)
+        raw_records = fetch_vex_logs_incremental(
+            base_url, token, query_string,
+            page_size=DEFAULT_PAGE_SIZE, last_source_log_id=last_source_log_id, date_from=date_from,
+        )
     if not raw_records:
         return 0
 

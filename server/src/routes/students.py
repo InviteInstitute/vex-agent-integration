@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException
 
 from src.block_catalog import resolve_available_blocks
 from src.current_state_metrics import (
+    build_current_program,
+    build_episode_summary,
     build_raw_logs_context,
     compute_snapshot_for_student_session,
     fetch_events_from_db,
@@ -253,6 +255,18 @@ def create_response(
                 student_id=student_id,
                 session_id=resolved_session_id,
             )
+            episode_summary = build_episode_summary(
+                student_id=student_id,
+                session_id=resolved_session_id,
+                events=events,
+            )
+            if episode_summary:
+                raw_logs = f"{episode_summary}\n{raw_logs}"
+            current_program = build_current_program(
+                student_id=student_id,
+                session_id=resolved_session_id,
+                events=events,
+            )
             recent_messages = get_recent_session_messages(
                 student_id,
                 resolved_playground,
@@ -301,6 +315,7 @@ def create_response(
                 task=task,
                 student_message=payload.student_message,
                 available_blocks=available_blocks,
+                current_program=current_program,
                 robot_behavior_summary=robot_behavior_summary,
                 recent_messages=recent_messages,
                 feedback_classes=feedback_classes,

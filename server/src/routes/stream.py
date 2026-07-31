@@ -12,7 +12,9 @@ import json
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from src.db import latest_proactive_message_id, get_proactive_messages_after
+from src.db import (
+    latest_proactive_message_id, get_proactive_messages_after, proactive_rev,
+)
 
 router = APIRouter(prefix="/v1", tags=["stream"])
 
@@ -36,11 +38,19 @@ def format_sse_event(message: dict) -> str:
 async def _event_stream(student_id: str):
     # Start at "now" so a fresh connection doesn't replay old proactive messages.
     last_id = await asyncio.to_thread(latest_proactive_message_id, student_id)
+    last_rev = await asyncio.to_thread(proactive_rev)
     while True:
-        rows = await asyncio.to_thread(get_proactive_messages_after, student_id, last_id)
-        for row in rows:
-            last_id = row["id"]
-            yield format_sse_event(row)
+        # O(1) change gate: only poll chat.messages when the proactive channel
+        # revision moved (a proactive row was inserted anywhere). Vendored from
+        # lm-dashboard's channel_rev pattern; falls back to polling if the rev
+        # table is unavailable (rev == 0 and no row).
+        rev = await asyncio.to_thread(proactive_rev)
+        if rev != last_rev:
+            last_rev = rev
+            rows = await asyncio.to_thread(get_proactive_messages_after, student_id, last_id)
+            for row in rows:
+                last_id = row["id"]
+                yield format_sse_event(row)
         # A comment line doubles as a keep-alive so proxies don't drop an idle stream.
         yield ": keep-alive\n\n"
         await asyncio.sleep(POLL_INTERVAL_S)

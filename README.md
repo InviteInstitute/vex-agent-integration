@@ -28,6 +28,9 @@ Copy [.env.example](/Users/tiffanyvuu/Documents/College/Semester8/CIS4914/senior
 - `INVITE_HUB_PASSWORD`
 - `TRIGGER_DAEMON_ENABLED` (proactive daemon, off by default)
 - `TRIGGER_POLL_INTERVAL_S`
+- `TRIGGER_STUDENT_RECENCY_HOURS` (scope to students active in last N hours; default 24)
+- `TRIGGER_IDLE_MAX_S` (idle-backoff ceiling; default 30s)
+- `TRIGGER_DISABLED` (comma-separated trigger types to detect-but-not-act-on)
 
 Example:
 
@@ -44,7 +47,7 @@ INVITE_HUB_PASSWORD=YOUR_PASSWORD
 # Proactive trigger daemon. Scope is every student with telemetry; when on it
 # proactively messages real students. scripts/start.sh follows this flag.
 TRIGGER_DAEMON_ENABLED=true
-TRIGGER_POLL_INTERVAL_S=20
+TRIGGER_POLL_INTERVAL_S=5
 ```
 
 ## Running Client and Server
@@ -78,6 +81,10 @@ Use local Postgres per team member, and apply the same migration files.
    - `psql "$DATABASE_URL" -f server/db/migrations/004_create_messages.sql`
    - `psql "$DATABASE_URL" -f server/db/migrations/005_create_message_feedback.sql`
    - `psql "$DATABASE_URL" -f server/db/migrations/006_create_agent_triggers.sql`
+   - `psql "$DATABASE_URL" -f server/db/migrations/007_agent_triggers_lifecycle.sql`
+   - `psql "$DATABASE_URL" -f server/db/migrations/008_student_id_case_folding.sql`
+   - `psql "$DATABASE_URL" -f server/db/migrations/009_switch_events.sql`
+   - `psql "$DATABASE_URL" -f server/db/migrations/010_channel_rev.sql`
 5. Load parsed logs:
    - `python3 server/src/parse_event_logs.py --input server/tests/fixtures/raw_logs/01_error_flagging_a.ndjson --insert`
 
@@ -120,13 +127,28 @@ The agent can reach out on its own. It watches the VEX log stream, measures how 
 
 Proactive messages reuse the normal feedback pipeline, so they share the same pedagogy as replies to a typed question. They are saved to `chat.messages` with `origin = 'proactive'` and delivered to the browser over Server-Sent Events.
 
+### Ported from lm-dashboard
+
+The trigger engine (`server/src/triggers/`) is vendored from [lm-dashboard](https://github.com/InviteInstitute/lm-dashboard) and kept in sync. The following modules were ported/aligned:
+
+- **`triggers/constants.py`** — trigger thresholds + APTED edit costs + episode-segmentation constants. `ITERATIVE_EDIT_MIN = 0` (any real edit counts toward Step-by-Step).
+- **`triggers/detectors.py`** — the pure momentary trigger pass (wheel_spin, resilience, explorer, iterative).
+- **`triggers/distance.py`** + **`triggers/ast_builder.py`** + **`triggers/run_sequence.py`** — APTED tree-edit distance over Blockly workspace ASTs.
+- **`triggers/episode_engine/`** — CODE/RUN/RESET episode segmentation with INACTIVE_PAUSE and POST_RUN_PAUSE detection (new; enriches the cognition classifier and the LLM grounding).
+- **`triggers/smart_delta.py`** — renders the student's current workspace as `[Active]/[Orphaned]` pseudo-code for the LLM (replaces the raw-log-dump grounding; addresses the spike's "hallucination from thin grounding" learning).
+- **`triggers/humanize.py`** + **`triggers/vex_blocks.json`** — readable program listing with parameter values (drive distances, etc.) that the edit-distance AST drops.
+- **`triggers/switches.py`** — identity-switch detection (casing flip, classCode change).
+- **Inactive trigger lifecycle** — re-alert after `RE_ALERT_SECONDS` (600s) so a persistently-idle student resurfaces, plus resolve-on-recovery (migration 007).
+- **Daemon hardening** — debounced run-distance cache, recency window on scope (`TRIGGER_STUDENT_RECENCY_HOURS`), idle/failure backoff with UNHEALTHY logging, `TRIGGER_DISABLED` runtime toggle.
+- **`channel_rev` O(1) SSE signaling** — the stream reads 1 row instead of polling `chat.messages` every 2s (migration 010).
+
 ### Turning It On
 
 The daemon is off by default. In your repo root `.env`:
 
 ```bash
 TRIGGER_DAEMON_ENABLED=true
-TRIGGER_POLL_INTERVAL_S=20
+TRIGGER_POLL_INTERVAL_S=5
 ```
 
 Restart the backend and the daemon starts with it. `scripts/start.sh` reads this flag from `.env` (it does not force it), so set `TRIGGER_DAEMON_ENABLED=true` there to run it. Its scope is **every student with telemetry** in `parsed_events`, so when on it proactively messages real students. It will not repeat a message, because each specific trigger (student, session, trigger type, run) fires at most once, so a student only hears from the agent again when genuinely new behavior trips a trigger.

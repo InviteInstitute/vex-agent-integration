@@ -72,6 +72,7 @@ def test_generate_main_llm_response_sanitizes_and_trims(monkeypatch):
                         lambda **k: 'Encouragement: "You are close. Keep going and try more."')
     out = ls.generate_main_llm_response(
         task="t", student_message="m", available_blocks=["drive"],
+        current_program="when started\ndrive for forward, amount 200",
         robot_behavior_summary="r", recent_messages=[],
         feedback_classes={FeedbackClass.REASSURE},
     )

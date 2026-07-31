@@ -108,6 +108,12 @@ class CurrentStateSnapshot:
     computed_from_event_id_min: int | None
     computed_from_event_id_max: int | None
     created_at: str
+    # Episode-segmentation signal (vendored from lm-dashboard's episode_engine). Not
+    # persisted (migration 002 has no columns for these) -- computed on the fly so the
+    # cognition classifier and the LLM prompt can use it. A POST_RUN_PAUSE is a "ran,
+    # then sat watching the result" gap; INACTIVE_PAUSE is a long idle (>= 300s).
+    post_run_pause_count: int = 0
+    inactive_pause_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -254,6 +260,107 @@ def build_raw_logs_context(
             )
         )
     return "\n".join(lines)
+
+
+def build_current_program(
+    student_id: str,
+    session_id: str,
+    *,
+    events: list[EventRecord] | None = None,
+) -> str:
+    """Render the student's current workspace as compact pseudo-code for the LLM,
+    via the vendored smart_delta engine ([Active]/[Orphaned] tree with fields).
+
+    Grounds the feedback in the student's ACTUAL code (not just the block catalog
+    or a raw-log dump) -- directly addresses the spike's "hallucination from thin
+    grounding" learning (design doc §9). Falls back to humanize's readable listing
+    (with parameter values) when smart_delta yields nothing. Returns "" when no
+    project snapshot exists.
+
+    Pass `events` to skip a redundant DB fetch (the reactive route already has them)."""
+    from src.triggers.smart_delta import generate_llm_prompt_from_project
+    from src.triggers.humanize import humanize_text
+    from src.triggers.ast_builder import extract_workspace_xml
+
+    if events is None:
+        events = fetch_events_from_db(student_id=student_id, session_id=session_id)
+    if not events:
+        return ""
+
+    # The latest runProject carries the most recent full workspace. Fall back to the
+    # latest event with a project_json if no runProject is present.
+    latest_project = None
+    for event in reversed(events):
+        if event.event_type == "runProject" and event.project_json:
+            latest_project = event.project_json
+            break
+    if latest_project is None:
+        for event in reversed(events):
+            if event.project_json:
+                latest_project = event.project_json
+                break
+    if not latest_project:
+        return ""
+
+    # smart_delta's bootstrap accepts a project dict (it json.loads strings, passes
+    # dicts through). Prefer its [Active]/[Orphaned] render; fall back to humanize's
+    # readable listing (which keeps <value> parameter numbers smart_delta drops).
+    prompt = generate_llm_prompt_from_project(
+        json.dumps(latest_project) if not isinstance(latest_project, str) else latest_project
+    )
+    if prompt:
+        return prompt
+
+    workspace_xml = extract_workspace_xml({"project": latest_project})
+    return humanize_text(workspace_xml)
+
+
+def _events_to_segmenter_input(events: list[EventRecord]) -> list[dict]:
+    """Adapt EventRecords to the episode segmenter's {event_type, ts} dict shape."""
+    return [
+        {
+            "event_type": event.event_type,
+            "ts": event.event_ts.timestamp() if event.event_ts else None,
+        }
+        for event in events
+    ]
+
+
+def segment_episodes_for_events(events: list[EventRecord]) -> tuple[list[dict], list[dict]]:
+    """Segment an EventRecord list into CODE/RUN/RESET episodes + pauses, via the
+    vendored episode_engine. Returns (episodes, pauses). Pure (no DB)."""
+    from src.triggers.episode_engine import segment_session
+    if not events:
+        return [], []
+    return segment_session(_events_to_segmenter_input(events))
+
+
+def build_episode_summary(
+    student_id: str,
+    session_id: str,
+    *,
+    events: list[EventRecord] | None = None,
+) -> str:
+    """A compact one-line-per-episode behavioral timeline for the LLM: what the
+    student did (CODE/RUN/RESET) and where they paused (post-run-watching vs idle).
+    Empty string when there's nothing to segment. Pass `events` to skip a DB fetch."""
+    if events is None:
+        events = fetch_events_from_db(student_id=student_id, session_id=session_id)
+    if not events:
+        return ""
+    episodes, pauses = segment_episodes_for_events(events)
+    if not episodes:
+        return ""
+    counts: Counter = Counter(ep["episode_type"] for ep in episodes)
+    parts = [f"{count} {kind}" for kind, count in counts.items()]
+    line = "Activity timeline: " + ", ".join(parts) + "."
+    post_run = [p for p in pauses if p["episode_type"] == "POST_RUN_PAUSE"]
+    inactive = [p for p in pauses if p["episode_type"] == "INACTIVE_PAUSE"]
+    if post_run:
+        line += f" {len(post_run)} post-run pause(s) (student watched their result)."
+    if inactive:
+        line += f" {len(inactive)} long idle gap(s)."
+    return line
 
 
 def select_current_playground_segment(events: list[EventRecord]) -> tuple[str, list[EventRecord]]:
@@ -410,6 +517,8 @@ def classify_cognition(
     action_level: ActionLevel,
     progress_pct: float,
     direction: Direction,
+    *,
+    post_run_pause_count: int = 0,
 ) -> CognitionCategory:
     if time_on_task_s >= 600.0 and progress_pct < 10.0 and action_level != ActionLevel.HIGH:
         return CognitionCategory.LONG_TERM_STALLED_PROGRESS
@@ -490,6 +599,16 @@ def classify_cognition(
     ):
         return CognitionCategory.SNAP_N_TEST
 
+    # Episode signal: a POST_RUN_PAUSE is "ran, then sat watching the result" -- the
+    # snap-and-test signature even when the 90s edit-to-run window above is missed.
+    if (
+        run_count >= 1
+        and snap_count >= 1
+        and post_run_pause_count >= 1
+        and action_level in {ActionLevel.MEDIUM, ActionLevel.HIGH}
+    ):
+        return CognitionCategory.SNAP_N_TEST
+
     return CognitionCategory.UNCLASSIFIED
 
 
@@ -500,6 +619,16 @@ def analyze_current_state(events: list[EventRecord]) -> CurrentStateSnapshot:
     progress_series = build_progress_series(segment, playground)
     progress_pct = round(progress_series[-1][1], 2) if progress_series else 0.0
     direction = compute_direction(progress_series, segment[0].event_ts, segment[-1].event_ts)
+    # Episode-segmentation pauses over the current segment: a POST_RUN_PAUSE is the
+    # "ran, then sat watching the result" signal SNAP_N_TEST looks for; INACTIVE_PAUSE
+    # is a long idle that direction/time-on-task should ideally not average across.
+    _, segment_pauses = segment_episodes_for_events(segment)
+    post_run_pause_count = sum(
+        1 for p in segment_pauses if p["episode_type"] == "POST_RUN_PAUSE"
+    )
+    inactive_pause_count = sum(
+        1 for p in segment_pauses if p["episode_type"] == "INACTIVE_PAUSE"
+    )
     cognition = classify_cognition(
         segment,
         progress_series,
@@ -507,6 +636,7 @@ def analyze_current_state(events: list[EventRecord]) -> CurrentStateSnapshot:
         action_level,
         progress_pct,
         direction,
+        post_run_pause_count=post_run_pause_count,
     )
     persistence = classify_persistence(time_on_task_s, action_level, progress_pct, direction)
 
@@ -524,6 +654,8 @@ def analyze_current_state(events: list[EventRecord]) -> CurrentStateSnapshot:
         computed_from_event_id_min=min(event_ids) if event_ids else None,
         computed_from_event_id_max=max(event_ids) if event_ids else None,
         created_at=datetime.now(timezone.utc).isoformat(),
+        post_run_pause_count=post_run_pause_count,
+        inactive_pause_count=inactive_pause_count,
     )
 
 

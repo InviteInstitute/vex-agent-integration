@@ -189,6 +189,9 @@ Task:
 Available blocks:
 {available_blocks}
 
+Student's current program (parsed from their workspace):
+{current_program}
+
 Student message:
 {student_message}
 
@@ -265,6 +268,9 @@ Task:
 Available blocks:
 {available_blocks}
 
+Student's current program (parsed from their workspace):
+{current_program}
+
 Student message:
 {student_message}
 
@@ -290,15 +296,16 @@ INSTRUCTIONS
 
 Use these sources in this priority order:
 1. Student message
-2. Robot behavior summary from the raw logs
-3. Recent chat
-4. Task
-5. Feedback type descriptions/examples/notes
+2. The student's current program (what blocks are actually on the workspace)
+3. Robot behavior summary from the raw logs
+4. Recent chat
+5. Task
+6. Feedback type descriptions/examples/notes
 
 Before writing feedback:
-- Use the robot behavior summary to understand what the robot is doing.
-- Only mention a block if the logs give enough evidence that it is currently on the workspace.
-- If the logs do not clearly show a current block, do not guess or mention one.
+- Use the student's current program as the source of truth for which blocks are on the workspace and how they are connected.
+- Use the robot behavior summary to understand what the robot does when the program runs.
+- Only mention a block that appears in the current program. If the current program is empty or unavailable, do not guess or mention a specific block.
 - Do not invent actions, errors, goals, or progress that are not supported by the inputs.
 
 How to write the feedback:
@@ -342,6 +349,7 @@ def build_feedback_prompt(
     task: str,
     student_message: str,
     available_blocks: str,
+    current_program: str,
     robot_behavior_summary: str,
     recent_chat: str,
     feedback_types: list[str],
@@ -368,6 +376,7 @@ def build_feedback_prompt(
         task=task,
         student_message=student_message,
         available_blocks=available_blocks,
+        current_program=current_program,
         robot_behavior_summary=robot_behavior_summary,
         recent_chat=recent_chat,
         feedback_types=feedback_types_text,
@@ -381,6 +390,7 @@ def build_feedback_prompt_from_classes(
     task: str,
     student_message: str,
     available_blocks: list[str] | None,
+    current_program: str,
     robot_behavior_summary: str,
     recent_messages: list[dict[str, str]],
     feedback_classes: set[FeedbackClass],
@@ -402,10 +412,14 @@ def build_feedback_prompt_from_classes(
     if not available_blocks_text:
         available_blocks_text = "None provided"
 
+    if not current_program:
+        current_program = "None available (no project snapshot yet)"
+
     return build_feedback_prompt(
         task=task,
         student_message=student_message,
         available_blocks=available_blocks_text,
+        current_program=current_program,
         robot_behavior_summary=robot_behavior_summary,
         recent_chat=recent_chat,
         feedback_types=feedback_types,

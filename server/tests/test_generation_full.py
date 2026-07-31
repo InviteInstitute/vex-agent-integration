@@ -5,6 +5,8 @@ from src import trigger_service as ts
 
 def test_generate_proactive_response_full_path(monkeypatch):
     monkeypatch.setattr(ts, "build_raw_logs_context", lambda **k: "raw logs")
+    monkeypatch.setattr(ts, "build_current_program", lambda **k: "[Active]\n whenStarted")
+    monkeypatch.setattr(ts, "build_episode_summary", lambda **k: "Activity timeline: 2 CODE, 1 RUN.")
     monkeypatch.setattr(ts, "generate_robot_behavior_summary",
                         lambda **k: {"response_text": "the robot drives forward"})
     monkeypatch.setattr(ts, "get_recent_session_messages", lambda *a, **k: [])
@@ -23,6 +25,8 @@ def test_generate_proactive_response_full_path(monkeypatch):
     assert captured["student_message"] == ""
     # neutral fact, never the internal label
     assert "wheel" not in captured["robot_behavior_summary"].lower()
+    # the current program grounds the prompt (not just the raw-log dump)
+    assert captured["current_program"] == "[Active]\n whenStarted"
 
 
 def test_run_proactive_tick_skips_non_acted_result(monkeypatch):
