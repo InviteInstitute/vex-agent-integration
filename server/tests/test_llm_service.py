@@ -51,12 +51,6 @@ def test_create_openai_client_uses_credentials(monkeypatch):
     assert made["api_key"] == "k" and made["base_url"] == "http://u"
 
 
-def test_generate_robot_behavior_summary(monkeypatch):
-    monkeypatch.setattr(ls, "execute_prompt", lambda **k: "the robot drives then stops")
-    out = ls.generate_robot_behavior_summary(task="t", raw_logs="logs")
-    assert out["response_text"] == "the robot drives then stops"
-
-
 def test_credentials_missing_raises(monkeypatch):
     import pytest
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -73,7 +67,7 @@ def test_generate_main_llm_response_sanitizes_and_trims(monkeypatch):
     out = ls.generate_main_llm_response(
         task="t", student_message="m", available_blocks=["drive"],
         current_program="when started\ndrive for forward, amount 200",
-        robot_behavior_summary="r", recent_messages=[],
+        situation="r", recent_messages=[],
         feedback_classes={FeedbackClass.REASSURE},
     )
     text = out["response_text"]

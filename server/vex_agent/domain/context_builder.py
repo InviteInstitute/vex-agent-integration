@@ -3,12 +3,16 @@ Context Builder
 """
 
 import json
-from collections import Counter
 from dataclasses import dataclass, field
 from typing import List
 
 from vex_agent.domain.feedback_policy import FeedbackClass
-from vex_agent.domain.metrics import EventRecord, segment_episodes_for_events
+from vex_agent.domain.metrics import (
+    GO_MARS_MILESTONE_RULES,
+    EventRecord,
+    analyze_current_state,
+    extract_playground_parameters,
+)
 from vex_agent.data.db import fetch_events_from_db
 
 @dataclass
@@ -200,8 +204,8 @@ Student's current program (parsed from their workspace):
 Student message:
 {student_message}
 
-Robot behavior summary from the raw logs:
-{robot_behavior_summary}
+What's happening now (measured from the session's telemetry):
+{situation}
 
 Recent chat in this session:
 {recent_chat}
@@ -223,14 +227,14 @@ INSTRUCTIONS
 Use these sources in this priority order:
 1. Student message
 2. The student's current program (what blocks are actually on the workspace)
-3. Robot behavior summary from the raw logs
+3. What's happening now (the measured telemetry facts)
 4. Recent chat
 5. Task
 6. Feedback type descriptions/examples/notes
 
 Before writing feedback:
 - Use the student's current program as the source of truth for which blocks are on the workspace and how they are connected.
-- Use the robot behavior summary to understand what the robot does when the program runs.
+- Use the measured telemetry facts to understand the student's progress, trajectory, and any error the robot reported. These facts are measured, not guessed -- trust them, but do not restate a number the student can already see.
 - Only mention a block that appears in the current program. If the current program is empty or unavailable, do not guess or mention a specific block.
 - Do not invent actions, errors, goals, or progress that are not supported by the inputs.
 
@@ -265,18 +269,12 @@ OUTPUT RULES
 - Never exceed 22 words.
 """
 
-ROBOT_BEHAVIOR_PROMPT_TEMPLATE = """You are an expert in VEXcode VR. I will give you log data. ONLY tell me what the robot does.
-
-Raw logs for this student and session:
-{raw_logs}
-"""
-
 def build_feedback_prompt(
     task: str,
     student_message: str,
     available_blocks: str,
     current_program: str,
-    robot_behavior_summary: str,
+    situation: str,
     recent_chat: str,
     feedback_types: list[str],
     feedback_specs: dict,
@@ -303,7 +301,7 @@ def build_feedback_prompt(
         student_message=student_message,
         available_blocks=available_blocks,
         current_program=current_program,
-        robot_behavior_summary=robot_behavior_summary,
+        situation=situation,
         recent_chat=recent_chat,
         feedback_types=feedback_types_text,
         descriptions=descriptions_text,
@@ -317,7 +315,7 @@ def build_feedback_prompt_from_classes(
     student_message: str,
     available_blocks: list[str] | None,
     current_program: str,
-    robot_behavior_summary: str,
+    situation: str,
     recent_messages: list[dict[str, str]],
     feedback_classes: set[FeedbackClass],
 ) -> str:
@@ -346,46 +344,11 @@ def build_feedback_prompt_from_classes(
         student_message=student_message,
         available_blocks=available_blocks_text,
         current_program=current_program,
-        robot_behavior_summary=robot_behavior_summary,
+        situation=situation,
         recent_chat=recent_chat,
         feedback_types=feedback_types,
         feedback_specs=FEEDBACK_SPECS,
     )
-
-
-def build_robot_behavior_prompt(task: str, raw_logs: str) -> str:
-    return ROBOT_BEHAVIOR_PROMPT_TEMPLATE.format(
-        raw_logs=raw_logs,
-    )
-
-
-def build_raw_logs_context(
-    student_id: str,
-    session_id: str,
-    *,
-    limit: int = 50,
-) -> str:
-    events = fetch_events_from_db(student_id=student_id, session_id=session_id)
-    if not events:
-        return "None"
-
-    selected_events = events[-limit:]
-    lines: list[str] = []
-    for event in selected_events:
-        lines.append(
-            json.dumps(
-                {
-                    "event_ts": event.event_ts.isoformat(),
-                    "event_type": event.event_type,
-                    "playground": event.playground,
-                    "block_event_data": event.block_event_data_json,
-                    "playground_data": event.playground_data_json,
-                    "error_message": event.error_message,
-                },
-                ensure_ascii=True,
-            )
-        )
-    return "\n".join(lines)
 
 
 def build_current_program(
@@ -441,29 +404,108 @@ def build_current_program(
     return humanize_text(workspace_xml)
 
 
-def build_episode_summary(
-    student_id: str,
-    session_id: str,
-    *,
-    events: list[EventRecord] | None = None,
-) -> str:
-    """A compact one-line-per-episode behavioral timeline for the LLM: what the
-    student did (CODE/RUN/RESET) and where they paused (post-run-watching vs idle).
-    Empty string when there's nothing to segment. Pass `events` to skip a DB fetch."""
-    if events is None:
-        events = fetch_events_from_db(student_id=student_id, session_id=session_id)
+# Neutral, plain-language readings of the deterministic snapshot signals. Never the
+# internal enum label (design doc §9) -- these phrase what the telemetry measured so the
+# single feedback call can ground on it without a second LLM "what did the robot do" pass.
+_DIRECTION_PHRASE = {
+    "INCREASING": "going up",
+    "DECREASING": "going down",
+    "STATIC": "holding steady",
+}
+_COGNITION_PHRASE = {
+    "LONG_TERM_STALLED_PROGRESS": "has spent a long time with little change in progress",
+    "DEVELOPMENT_INCREASES_PROGRESS": "has been improving their progress with recent changes",
+    "DEVELOPMENT_STATIC_PROGRESS": "has been editing but progress has held steady",
+    "DEVELOPMENT_DECREASES_PROGRESS": "made recent changes that lowered their progress",
+    "TRIAL_AND_ERROR": "is trying many quick changes and re-running to see what happens",
+    "CODE_ABANDONMENT": "removed code that had been improving their progress",
+    "STEP_BY_STEP_ELIMINATION": "is removing pieces one at a time to isolate a problem",
+    "SNAP_N_TEST": "is adding one block at a time and testing after each",
+}
+_PERSISTENCE_PHRASE = {
+    "HIGH_PERSISTER": "has kept trying persistently despite low progress",
+    "EARLY_QUITTER": "showed signs of stopping early",
+    "EXPECTED_COMPLETION": "is at or near finishing the task",
+}
+# Readable names for the GO-Mars milestone rules -- turns the aggregate progress % into
+# the concrete goal-gap (which milestones are done vs still to do) for the tutor.
+_MILESTONE_LABEL = {
+    "move_sample_out_of_crater": "move a sample out of the crater",
+    "place_sample_on_lab": "place a sample on the lab",
+    "tilt_solar_panel": "tilt the solar panel",
+    "move_hero_bot_out_of_crater": "rescue the rover",
+    "lift_rocket_ship_upright": "lift the rocket ship upright",
+    "remove_fuel_cells_from_cradles": "remove fuel cells from the cradles",
+}
+
+
+def build_situation_model(events: list[EventRecord] | None) -> str:
+    """Deterministic grounding facts for the feedback prompt, read straight from the
+    session's structured telemetry. This REPLACES the old raw-log LLM summary pass: the
+    same CurrentStateSnapshot the feedback-class policy already computes (progress toward
+    the goal, its trajectory, the student's work pattern, persistence, reflective pauses),
+    the concrete milestones done vs still to do, and the last error the robot reported --
+    rendered as a compact labeled block.
+
+    Every fact is measured, not paraphrased, so nothing here can hallucinate (design doc
+    §9). Never emits raw logs. Returns "None" when there is nothing to ground on (no
+    events, or a playground with no configured progress metric)."""
     if not events:
-        return ""
-    episodes, pauses = segment_episodes_for_events(events)
-    if not episodes:
-        return ""
-    counts: Counter = Counter(ep["episode_type"] for ep in episodes)
-    parts = [f"{count} {kind}" for kind, count in counts.items()]
-    line = "Activity timeline: " + ", ".join(parts) + "."
-    post_run = [p for p in pauses if p["episode_type"] == "POST_RUN_PAUSE"]
-    inactive = [p for p in pauses if p["episode_type"] == "INACTIVE_PAUSE"]
-    if post_run:
-        line += f" {len(post_run)} post-run pause(s) (student watched their result)."
-    if inactive:
-        line += f" {len(inactive)} long idle gap(s)."
-    return line
+        return "None"
+    # ponytail: progress metric is GO-Mars-only; analyze_current_state raises ValueError
+    # for any other playground. Degrade to code-only grounding rather than break feedback.
+    try:
+        snapshot = analyze_current_state(events)
+    except ValueError:
+        return "None"
+
+    lines = [
+        f"Goal progress: {snapshot.progress_pct:.0f}% "
+        f"({_DIRECTION_PHRASE.get(snapshot.direction.value, 'holding steady')})."
+    ]
+
+    # Concrete goal-gap: evaluate each milestone rule on the latest playgroundData
+    # parameters (straight from the log payload) -- done vs still to do.
+    parameters: dict = {}
+    for event in reversed(events):
+        params = extract_playground_parameters(event.playground_data_json)
+        if params:
+            parameters = params
+            break
+    if parameters:
+        done = [
+            label for name, label in _MILESTONE_LABEL.items()
+            if GO_MARS_MILESTONE_RULES[name](parameters)
+        ]
+        todo = [
+            label for name, label in _MILESTONE_LABEL.items()
+            if not GO_MARS_MILESTONE_RULES[name](parameters)
+        ]
+        if done:
+            lines.append("Milestones done: " + ", ".join(done) + ".")
+        if todo:
+            lines.append("Still to do: " + ", ".join(todo) + ".")
+
+    run_count = sum(1 for event in events if event.event_type == "runProject")
+    lines.append(
+        f"Time on task: {snapshot.time_on_task_s / 60.0:.0f} min, {run_count} run(s) so far."
+    )
+
+    pattern = _COGNITION_PHRASE.get(snapshot.cognition.value)
+    if pattern:
+        lines.append(f"Work pattern: the student {pattern}.")
+    persistence = _PERSISTENCE_PHRASE.get(snapshot.persistence.value)
+    if persistence:
+        lines.append(f"Persistence: the student {persistence}.")
+    if snapshot.post_run_pause_count:
+        lines.append(
+            f"The student paused to watch the result {snapshot.post_run_pause_count} time(s)."
+        )
+
+    last_error = next(
+        (event.error_message for event in reversed(events) if event.error_message), None
+    )
+    if last_error:
+        lines.append(f"Most recent error the robot reported: {last_error}")
+
+    return "\n".join(lines)

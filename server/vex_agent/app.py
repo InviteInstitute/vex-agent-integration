@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -11,14 +12,32 @@ from vex_agent.api.admin import router as admin_router
 from vex_agent.api.stream import router as stream_router
 from vex_agent.api.system import router as system_router
 from vex_agent.services.daemon import start_daemon, stop_daemon
+from vex_agent.services.logsync import sync_invite_hub_logs
+from vex_agent.llm.client import get_openai_client
 from vex_agent.api.turnstile import TurnstileGateMiddleware
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+logger = logging.getLogger(__name__)
 
 load_dotenv()
+
+
+def warm_up() -> None:
+    """Prime the process-global singletons that would otherwise be built inside the
+    FIRST student request -- the LLM HTTP client and the Invite Hub auth token (~1s
+    token POST). Moves that cold-start off the request path onto boot. Best-effort:
+    a dependency that's cold at boot must not block startup."""
+    try:
+        get_openai_client()
+    except Exception:
+        logger.warning("LLM client warm-up skipped", exc_info=True)
+    try:
+        sync_invite_hub_logs()  # primes + caches the Invite Hub auth token
+    except Exception:
+        logger.warning("Invite Hub warm-up sync skipped", exc_info=True)
 
 
 def get_allowed_origins() -> list[str]:
@@ -37,6 +56,10 @@ def get_allowed_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Prime lazy singletons (LLM client + Invite Hub token) so the first student
+    # request doesn't pay ~1.3s of cold-start. In a background thread so the backlog
+    # drain inside the warm-up sync can't block startup/readiness.
+    threading.Thread(target=warm_up, name="warm-up", daemon=True).start()
     # Start the proactive trigger daemon (no-op unless TRIGGER_DAEMON_ENABLED).
     start_daemon()
     yield

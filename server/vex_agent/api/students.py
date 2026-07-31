@@ -240,19 +240,11 @@ def create_response(
                 events=events,
             )
             llm_request = result["llm_request"]
-            robot_behavior_request = result["robot_behavior_request"]
             log_stage(
-                "Robot Behavior Prompt Sent",
+                "Situation Model",
                 student_id=student_id,
                 session_id=resolved_session_id,
-                model=robot_behavior_request["model"],
-                prompt=robot_behavior_request["prompt"],
-            )
-            log_stage(
-                "Robot Behavior Output",
-                student_id=student_id,
-                session_id=resolved_session_id,
-                behavior_summary=result["robot_behavior_summary"],
+                situation=result["situation"],
             )
             log_stage(
                 "LLM Prompt Sent",

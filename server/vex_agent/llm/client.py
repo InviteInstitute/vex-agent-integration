@@ -5,10 +5,7 @@ from pathlib import Path
 
 import openai
 
-from vex_agent.domain.context_builder import (
-    build_feedback_prompt_from_classes,
-    build_robot_behavior_prompt,
-)
+from vex_agent.domain.context_builder import build_feedback_prompt_from_classes
 from vex_agent.domain.feedback_policy import FeedbackClass
 from vex_agent.llm.sanitizer import sanitize_llm_output
 from vex_agent.config import get_navigator_model
@@ -30,7 +27,7 @@ def prepare_main_llm_request(
     student_message: str,
     available_blocks: list[str] | None,
     current_program: str,
-    robot_behavior_summary: str,
+    situation: str,
     recent_messages: list[dict[str, str]],
     feedback_classes: set[FeedbackClass],
 ) -> dict[str, str]:
@@ -39,7 +36,7 @@ def prepare_main_llm_request(
         student_message=student_message,
         available_blocks=available_blocks,
         current_program=current_program,
-        robot_behavior_summary=robot_behavior_summary,
+        situation=situation,
         recent_messages=recent_messages,
         feedback_classes=feedback_classes,
     )
@@ -78,9 +75,8 @@ def create_openai_client() -> openai.OpenAI:
 
 
 def get_openai_client() -> openai.OpenAI:
-    """Lazily-created, process-wide client so back-to-back calls (robot-behavior
-    summary, then main response) reuse one warm connection instead of each paying
-    a fresh TCP+TLS handshake to the LLM endpoint."""
+    """Lazily-created, process-wide client so calls across requests reuse one warm
+    connection instead of each paying a fresh TCP+TLS handshake to the LLM endpoint."""
     global _client
     if _client is None:
         _client = create_openai_client()
@@ -133,26 +129,12 @@ def enforce_student_response_length(response_text: str) -> str:
     return trimmed_text
 
 
-def generate_robot_behavior_summary(task: str, raw_logs: str) -> dict[str, str]:
-    model = get_navigator_model()
-    prompt = build_robot_behavior_prompt(
-        task=task,
-        raw_logs=raw_logs,
-    )
-    response_text = execute_prompt(model=model, prompt=prompt)
-    return {
-        "model": model,
-        "prompt": prompt,
-        "response_text": response_text,
-    }
-
-
 def generate_main_llm_response(
     task: str,
     student_message: str,
     available_blocks: list[str] | None,
     current_program: str,
-    robot_behavior_summary: str,
+    situation: str,
     recent_messages: list[dict[str, str]],
     feedback_classes: set[FeedbackClass],
 ) -> dict[str, str]:
@@ -161,7 +143,7 @@ def generate_main_llm_response(
         student_message=student_message,
         available_blocks=available_blocks,
         current_program=current_program,
-        robot_behavior_summary=robot_behavior_summary,
+        situation=situation,
         recent_messages=recent_messages,
         feedback_classes=feedback_classes,
     )

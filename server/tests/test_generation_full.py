@@ -6,11 +6,9 @@ from vex_agent.services import feedback as fb
 
 def test_generate_proactive_response_full_path(monkeypatch):
     # The pipeline internals now live in the shared feedback module; patch them there.
-    monkeypatch.setattr(fb, "build_raw_logs_context", lambda **k: "raw logs")
+    monkeypatch.setattr(fb, "fetch_events_from_db", lambda **k: ["evt"])
     monkeypatch.setattr(fb, "build_current_program", lambda **k: "[Active]\n whenStarted")
-    monkeypatch.setattr(fb, "build_episode_summary", lambda **k: "Activity timeline: 2 CODE, 1 RUN.")
-    monkeypatch.setattr(fb, "generate_robot_behavior_summary",
-                        lambda **k: {"response_text": "the robot drives forward"})
+    monkeypatch.setattr(fb, "build_situation_model", lambda events: "Goal progress: 20% (holding steady).")
     monkeypatch.setattr(fb, "get_recent_session_messages", lambda *a, **k: [])
     captured = {}
 
@@ -22,11 +20,11 @@ def test_generate_proactive_response_full_path(monkeypatch):
 
     out = ts.generate_proactive_response("stu", "sess", "wheel_spin", {"value": "6 identical reruns"})
     assert out["response_text"] == "You're close."
-    # grounded on the real robot-behavior summary, and no student turn is faked
-    assert "the robot drives forward" in captured["robot_behavior_summary"]
+    # grounded on the measured situation model, plus the neutral trigger fact appended
+    assert "Goal progress: 20%" in captured["situation"]
     assert captured["student_message"] == ""
     # neutral fact, never the internal label
-    assert "wheel" not in captured["robot_behavior_summary"].lower()
+    assert "wheel" not in captured["situation"].lower()
     # the current program grounds the prompt (not just the raw-log dump)
     assert captured["current_program"] == "[Active]\n whenStarted"
 
