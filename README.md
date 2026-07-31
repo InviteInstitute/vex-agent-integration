@@ -4,7 +4,7 @@
 
 ### Frontend (`client/.env.local`)
 
-Copy [client/.env.example](/Users/tiffanyvuu/Documents/College/Semester8/CIS4914/senior-project/client/.env.example) to `client/.env.local` and set:
+Copy [client/.env.example](client/.env.example) to `client/.env.local` and set:
 
 - `VITE_API_BASE_URL`
 
@@ -16,7 +16,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000/v1
 
 ### Backend (repo root `.env` or deployment env vars)
 
-Copy [.env.example](/Users/tiffanyvuu/Documents/College/Semester8/CIS4914/senior-project/.env.example) to a repo root `.env` for local development, or set the same variables in your deployment platform:
+Copy [.env.example](.env.example) to a repo root `.env` for local development, or set the same variables in your deployment platform:
 
 - `DATABASE_URL`
 - `OPENAI_API_KEY`
@@ -50,43 +50,59 @@ TRIGGER_DAEMON_ENABLED=true
 TRIGGER_POLL_INTERVAL_S=5
 ```
 
-## Running Client and Server
-1. Client:
-   - `cd client`
-   - `cp .env.example .env.local`
-   - `npm install`
-   - `npm run dev`
-2. Server:
-   - create a repo root `.env` from [.env.example](/Users/tiffanyvuu/Documents/College/Semester8/CIS4914/senior-project/.env.example), or export the backend env vars
-   - `cd server`
-   - `source .venv/bin/activate`
-   - `uvicorn vex_agent.app:app --reload --log-level info`
+## Running
 
-## Local DB Setup (Team Workflow)
+The backend is a Python package (`vex_agent`) under `server/`. Two ways to run it:
 
-Use local Postgres per team member, and apply the same migration files.
+### Docker Compose (recommended)
 
-1. Create and activate a virtual environment:
-   - `python3 -m venv .venv`
-   - `source .venv/bin/activate`
-2. Install shared dependencies:
-   - `pip install -r server/requirements.txt`
-3. Create your own `.env` at repo root:
-   - `cp .env.example .env`
-4. Run migrations:
-   - `export $(grep -v '^#' .env | xargs)`
-   - `psql "$DATABASE_URL" -f server/db/migrations/001_create_parsed_events.sql`
-   - `psql "$DATABASE_URL" -f server/db/migrations/002_create_state_snapshots.sql`
-   - `psql "$DATABASE_URL" -f server/db/migrations/003_add_playground_data_to_parsed_events.sql`
-   - `psql "$DATABASE_URL" -f server/db/migrations/004_create_messages.sql`
-   - `psql "$DATABASE_URL" -f server/db/migrations/005_create_message_feedback.sql`
-   - `psql "$DATABASE_URL" -f server/db/migrations/006_create_agent_triggers.sql`
-   - `psql "$DATABASE_URL" -f server/db/migrations/007_agent_triggers_lifecycle.sql`
-   - `psql "$DATABASE_URL" -f server/db/migrations/008_student_id_case_folding.sql`
-   - `psql "$DATABASE_URL" -f server/db/migrations/009_switch_events.sql`
-   - `psql "$DATABASE_URL" -f server/db/migrations/010_channel_rev.sql`
-5. Load parsed logs:
-   - `python3 server/src/parse_event_logs.py --input server/tests/fixtures/raw_logs/01_error_flagging_a.ndjson --insert`
+Brings up Postgres + the API together. Migrations under `server/db/migrations/` are the
+source of truth for the schema.
+
+```bash
+cp .env.example .env      # fill in secrets; POSTGRES_PASSWORD is required
+docker compose up --build
+```
+
+- API: `http://127.0.0.1:8001` (container port 8000)
+- Postgres: `127.0.0.1:5433` (container port 5432)
+
+Apply migrations once against the running DB (see the loop below), pointing `DATABASE_URL`
+at `127.0.0.1:5433`.
+
+### Bare metal (local dev)
+
+1. Backend:
+   ```bash
+   cd server
+   python3 -m venv .venv && source .venv/bin/activate
+   pip install -e '.[dev]'          # deps from pyproject.toml; adds pytest for tests
+   uvicorn vex_agent.app:app --reload --log-level info   # :8000
+   ```
+2. Client:
+   ```bash
+   cd client
+   cp .env.example .env.local        # VITE_API_BASE_URL, e.g. http://127.0.0.1:8000/v1
+   npm install && npm run dev         # :5173
+   ```
+
+macOS users can use `scripts/start.sh` / `scripts/stop.sh` (optional convenience:
+brew Postgres + auto-detect local Ollama).
+
+## Database migrations
+
+Apply every migration in order (drift-proof — no per-file list to keep updated):
+
+```bash
+export $(grep -v '^#' .env | xargs)
+for f in server/db/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
+```
+
+Load a fixture session (uses the installed console script; `pip install -e .` first):
+
+```bash
+vex-parse-logs --input server/tests/fixtures/raw_logs/01_error_flagging_a.ndjson --insert
+```
 
 ## Fetch VEX Logs From Invite Institute Hub
 
@@ -98,11 +114,11 @@ Store your Invite Hub credentials in the repo root `.env`:
 
 Then fetch the latest VEX logs and save them locally:
 
-- `python3 server/src/fetch_invite_hub_logs.py`
+- `vex-fetch-logs`
 
 Fetch and immediately parse + insert into Postgres:
 
-- `python3 server/src/fetch_invite_hub_logs.py --insert`
+- `vex-fetch-logs --insert`
 
 ## Navigator
 - Go to https://docs.rc.ufl.edu/training/NaviGator_Toolkit/ and follow instructions to set up API key.
@@ -129,7 +145,7 @@ Proactive messages reuse the normal feedback pipeline, so they share the same pe
 
 ### Ported from lm-dashboard
 
-The trigger engine (`server/src/triggers/`) is vendored from [lm-dashboard](https://github.com/InviteInstitute/lm-dashboard) and kept in sync. The following modules were ported/aligned:
+The trigger engine (`server/vex_agent/triggers/`) is vendored from [lm-dashboard](https://github.com/InviteInstitute/lm-dashboard) and kept in sync. The following modules were ported/aligned:
 
 - **`triggers/constants.py`** — trigger thresholds + APTED edit costs + episode-segmentation constants. `ITERATIVE_EDIT_MIN = 0` (any real edit counts toward Step-by-Step).
 - **`triggers/detectors.py`** — the pure momentary trigger pass (wheel_spin, resilience, explorer, iterative).
