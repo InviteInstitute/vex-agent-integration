@@ -238,10 +238,10 @@ def generate_proactive_response(
     pipeline (so proactive and reactive share the same pedagogy + sanitizer + trim).
     Returns None for triggers v1 doesn't act on.
 
-    Two spike learnings baked in: (1) the message is grounded in the REAL robot-behavior
-    summary over the session's logs, not the trigger fact alone; (2) the trigger enters
-    as a NEUTRAL behavioral fact, never its internal label, and student_message is empty
-    (there is no student turn)."""
+    Two spike learnings baked in: (1) the message is grounded in the REAL measured
+    situation model over the session's telemetry, not the trigger fact alone; (2) the
+    trigger enters as a NEUTRAL behavioral fact, never its internal label, and
+    student_message is empty (there is no student turn)."""
     if trigger_type not in ACTED_TRIGGERS:
         return None
     if trigger_type in disabled_trigger_types():  # runtime toggle (TRIGGER_DISABLED env)
