@@ -34,7 +34,6 @@ from vex_agent.domain.catalogs import resolve_task_description
 
 router = APIRouter(prefix="/v1", tags=["students"])
 logger = logging.getLogger(__name__)
-SESSION_CACHE_TTL_S = 60.0
 SYNC_COOLDOWN_S = 15.0
 ACTIVE_RUN_MESSAGE = (
     "Please stop your current run using the Stop button in the bottom-left of the playground, "
@@ -43,7 +42,6 @@ ACTIVE_RUN_MESSAGE = (
 WRONG_PLAYGROUND_MESSAGE = (
     "You are on the wrong playground right now. Switch to GO-Mars, then ask for help again."
 )
-_latest_session_cache: dict[str, tuple[str, float]] = {}
 _last_sync_at: dict[str, float] = {}
 
 
@@ -51,21 +49,6 @@ def log_stage(stage: str, **fields: object) -> None:
     lines = [f"[{stage}]"]
     lines.extend(f"  {key}: {value}" for key, value in fields.items())
     logger.info("\n".join(lines))
-
-
-def remember_latest_session(student_id: str, session_id: str) -> None:
-    _latest_session_cache[student_id] = (session_id, monotonic())
-
-
-def get_cached_session_id(student_id: str) -> str | None:
-    cached = _latest_session_cache.get(student_id)
-    if not cached:
-        return None
-    session_id, cached_at = cached
-    if monotonic() - cached_at > SESSION_CACHE_TTL_S:
-        _latest_session_cache.pop(student_id, None)
-        return None
-    return session_id
 
 
 def maybe_sync_invite_hub_logs(student_id: str) -> int:
@@ -79,9 +62,6 @@ def maybe_sync_invite_hub_logs(student_id: str) -> int:
 
 
 def resolve_session_id_for_student(student_id: str) -> str:
-    cached_session_id = get_cached_session_id(student_id)
-    if cached_session_id is not None:
-        return cached_session_id
     session_id = get_latest_session_id_for_student(student_id)
     if session_id is None:
         raise HTTPException(
@@ -91,7 +71,6 @@ def resolve_session_id_for_student(student_id: str) -> str:
                 "Run the project once in VEX VR, then try again."
             ),
         )
-    remember_latest_session(student_id, session_id)
     return session_id
 
 
@@ -137,7 +116,6 @@ def create_message(student_id: str, payload: MessageRequest) -> MessageResponse:
     resolved_playground = payload.playground or DEFAULT_PLAYGROUND
     if payload.session_id:
         resolved_session_id = payload.session_id
-        remember_latest_session(student_id, resolved_session_id)
     else:
         resolved_session_id, _ = resolve_session_id_with_sync(student_id)
     session_uuid = UUID(resolved_session_id)
@@ -194,8 +172,6 @@ def create_response(
         try:
             if resolved_session_id is None:
                 resolved_session_id, synced_log_count = resolve_session_id_with_sync(student_id)
-            else:
-                remember_latest_session(student_id, resolved_session_id)
             events = fetch_events_from_db(
                 student_id=student_id,
                 session_id=resolved_session_id,
