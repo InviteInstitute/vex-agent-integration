@@ -2,7 +2,7 @@
 branches (the parts test_trigger_daemon.py's pure tests don't reach)."""
 import threading
 
-from src import trigger_daemon as td
+from vex_agent.services import daemon as td
 
 
 def test_config_getters(monkeypatch):
@@ -55,3 +55,24 @@ def test_run_daemon_tick_swallows_tick_failure(monkeypatch):
     monkeypatch.setattr(td, "run_proactive_tick", boom)
     out = td.run_daemon_tick()  # per-student failure is logged, not fatal
     assert out["acted"] == []
+
+
+def test_idle_and_recency_config_getters(monkeypatch):
+    monkeypatch.setenv("TRIGGER_IDLE_MAX_S", "60")
+    monkeypatch.setenv("TRIGGER_STUDENT_RECENCY_HOURS", "12")
+    assert td.idle_max_s() == 60.0
+    assert td.student_recency_hours() == 12.0
+
+
+def test_idle_max_defaults_to_30s(monkeypatch):
+    # Ported from lm-dashboard's PIPELINE_IDLE_MAX default: real headroom above
+    # the base interval so idle backoff actually does something, independent of
+    # whatever TRIGGER_POLL_INTERVAL_S is set to.
+    monkeypatch.setenv("TRIGGER_POLL_INTERVAL_S", "20")
+    monkeypatch.delenv("TRIGGER_IDLE_MAX_S", raising=False)
+    assert td.idle_max_s() == 30.0
+
+
+def test_poll_interval_defaults_to_5s(monkeypatch):
+    monkeypatch.delenv("TRIGGER_POLL_INTERVAL_S", raising=False)
+    assert td.poll_interval_s() == 5.0

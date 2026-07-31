@@ -1,7 +1,7 @@
 """Tests for the daemon scope (now: every student with telemetry). All monkeypatched --
 no DB, no Ollama, no prod. The properties (scope is all_students, no prod hit when there
 is no telemetry) are the point."""
-from src import trigger_daemon as td
+from vex_agent.services import daemon as td
 
 
 def test_daemon_disabled_by_default(monkeypatch):
@@ -10,13 +10,23 @@ def test_daemon_disabled_by_default(monkeypatch):
 
 
 def test_scope_is_empty_when_no_telemetry(monkeypatch):
-    monkeypatch.setattr(td, "all_students", lambda: [])
+    monkeypatch.setattr(td, "all_students", lambda **k: [])
     assert td.in_scope_students() == set()  # no telemetry -> nobody
 
 
 def test_scope_is_every_student(monkeypatch):
-    monkeypatch.setattr(td, "all_students", lambda: ["a", "b", "c"])
+    monkeypatch.setattr(td, "all_students", lambda **k: ["a", "b", "c"])
     assert td.in_scope_students() == {"a", "b", "c"}
+
+
+def test_scope_passes_recency_window(monkeypatch):
+    # the daemon scopes to RECENT students, not all-time: all_students is called with
+    # recency_hours from TRIGGER_STUDENT_RECENCY_HOURS (default 24).
+    seen = {}
+    monkeypatch.setattr(td, "all_students", lambda **k: (seen.update(k), ["a"])[1])
+    monkeypatch.setenv("TRIGGER_STUDENT_RECENCY_HOURS", "6")
+    td.in_scope_students()
+    assert seen.get("recency_hours") == 6.0
 
 
 def test_empty_scope_noops_without_touching_prod(monkeypatch):

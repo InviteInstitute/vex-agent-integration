@@ -255,6 +255,14 @@ function App() {
     return () => source.close();
   }, [studentId, apiBase]);
 
+  // Trip the Turnstile gate at page load instead of waiting for the first real
+  // chat call (which otherwise doesn't happen until the student types an id and
+  // starts a session). Side-effect-free; the response is discarded either way.
+  useEffect(() => {
+    getJson("/ping").catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const endInteraction = () => {
       const pointerId = interactionRef.current?.pointerId;
@@ -449,6 +457,15 @@ function App() {
     setMessages((current) => [...current, message]);
   };
 
+  // The server's TurnstileGateMiddleware 403s any /v1/* call from a browser
+  // that hasn't solved the widget yet. Surface that as a DOM event so
+  // TurnstileGate.jsx (mounted once, above <App/>) can show the challenge.
+  const checkTurnstileRequired = (response, data) => {
+    if (response.status === 403 && data.error === "turnstile_required") {
+      window.dispatchEvent(new CustomEvent("turnstile:required"));
+    }
+  };
+
   const postJson = async (path, payload) => {
     const response = await fetch(`${apiBase}${path}`, {
       method: "POST",
@@ -461,6 +478,7 @@ function App() {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
+      checkTurnstileRequired(response, data);
       throw new Error(data.detail || `Request failed with status ${response.status}`);
     }
 
@@ -472,6 +490,7 @@ function App() {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
+      checkTurnstileRequired(response, data);
       throw new Error(data.detail || `Request failed with status ${response.status}`);
     }
 

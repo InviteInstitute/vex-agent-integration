@@ -14,7 +14,7 @@ STUDENT = "fixture_07_1"
 
 
 def _cleanup():
-    from src.db import get_conn
+    from vex_agent.data.db import get_conn
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM chat.messages WHERE student_id=%s", (STUDENT,))
@@ -22,8 +22,8 @@ def _cleanup():
 
 
 def test_daemon_scopes_generates_delivers_and_dedups(monkeypatch):
-    from src import trigger_daemon as td, trigger_service
-    from src.db import latest_proactive_message_id, get_proactive_messages_after
+    from vex_agent.services import daemon as td, proactive as trigger_service
+    from vex_agent.data.db import latest_proactive_message_id, get_proactive_messages_after
 
     # pin scope to just this fixture so the tick doesn't fan out to every student
     monkeypatch.setattr(td, "in_scope_students", lambda: {STUDENT})

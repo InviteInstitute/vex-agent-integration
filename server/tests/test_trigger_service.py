@@ -4,8 +4,8 @@ Run from server/:  PYTHONPATH=. ../.venv/bin/python -m pytest tests/test_trigger
 """
 from datetime import datetime, timezone
 
-from src.current_state_metrics import EventRecord
-from src.trigger_service import compute_run_distances
+from vex_agent.domain.metrics import EventRecord
+from vex_agent.services.proactive import compute_run_distances
 
 XMLNS = 'xmlns="https://developers.google.com/blockly/xml"'
 WS_A = f'<xml {XMLNS}><block type="pg_events_when_started" id="s"></block></xml>'
@@ -52,3 +52,40 @@ def test_playground_switch_resets_distance_to_none():
     events = [_run(WS_A, 0, "GO-Mars"), _run(WS_B, 1, "CoralReefRescue")]
     runs = compute_run_distances(events)
     assert runs[1]["edit_distance"] is None  # first run of a new playground stretch
+
+
+def test_run_cache_skips_recompute_on_signature_match(monkeypatch):
+    # the cached path must return the same sequence without re-running APTED
+    from vex_agent.services import proactive as ts
+
+    events = [_run(WS_A, 0), _run(WS_B, 1)]
+    calls = {"compute": 0}
+    real = ts.compute_run_distances
+
+    def counting(events):
+        calls["compute"] += 1
+        return real(events)
+
+    monkeypatch.setattr(ts, "compute_run_distances", counting)
+    monkeypatch.setattr(ts, "fetch_events_from_db", lambda **k: events)
+    ts.clear_run_cache()
+
+    first = ts.compute_run_distances_for_session("stu", "sess")
+    second = ts.compute_run_distances_for_session("stu", "sess")
+    assert first == second
+    assert calls["compute"] == 1  # APTED ran once; the second call hit the cache
+
+
+def test_run_cache_invalidates_when_events_grow(monkeypatch):
+    from vex_agent.services import proactive as ts
+
+    ev1 = [_run(WS_A, 0)]
+    ev2 = [_run(WS_A, 0), _run(WS_B, 1)]
+    state = {"events": ev1}
+    monkeypatch.setattr(ts, "fetch_events_from_db", lambda **k: state["events"])
+    ts.clear_run_cache()
+
+    first = ts.compute_run_distances_for_session("stu", "sess")
+    state["events"] = ev2  # a new run landed
+    second = ts.compute_run_distances_for_session("stu", "sess")
+    assert len(first) == 1 and len(second) == 2  # cache invalidated, recomputed

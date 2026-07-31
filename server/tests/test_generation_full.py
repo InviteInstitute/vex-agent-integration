@@ -1,20 +1,24 @@
 """Covers the generate_proactive_response LLM path and run_proactive_tick's
 non-acted branch (the lines the pure/DB tests don't reach), all mocked."""
-from src import trigger_service as ts
+from vex_agent.services import proactive as ts
+from vex_agent.services import feedback as fb
 
 
 def test_generate_proactive_response_full_path(monkeypatch):
-    monkeypatch.setattr(ts, "build_raw_logs_context", lambda **k: "raw logs")
-    monkeypatch.setattr(ts, "generate_robot_behavior_summary",
+    # The pipeline internals now live in the shared feedback module; patch them there.
+    monkeypatch.setattr(fb, "build_raw_logs_context", lambda **k: "raw logs")
+    monkeypatch.setattr(fb, "build_current_program", lambda **k: "[Active]\n whenStarted")
+    monkeypatch.setattr(fb, "build_episode_summary", lambda **k: "Activity timeline: 2 CODE, 1 RUN.")
+    monkeypatch.setattr(fb, "generate_robot_behavior_summary",
                         lambda **k: {"response_text": "the robot drives forward"})
-    monkeypatch.setattr(ts, "get_recent_session_messages", lambda *a, **k: [])
+    monkeypatch.setattr(fb, "get_recent_session_messages", lambda *a, **k: [])
     captured = {}
 
     def fake_main(**kwargs):
         captured.update(kwargs)
         return {"response_text": "You're close.", "model": "m", "prompt": "p"}
 
-    monkeypatch.setattr(ts, "generate_main_llm_response", fake_main)
+    monkeypatch.setattr(fb, "generate_main_llm_response", fake_main)
 
     out = ts.generate_proactive_response("stu", "sess", "wheel_spin", {"value": "6 identical reruns"})
     assert out["response_text"] == "You're close."
@@ -23,6 +27,8 @@ def test_generate_proactive_response_full_path(monkeypatch):
     assert captured["student_message"] == ""
     # neutral fact, never the internal label
     assert "wheel" not in captured["robot_behavior_summary"].lower()
+    # the current program grounds the prompt (not just the raw-log dump)
+    assert captured["current_program"] == "[Active]\n whenStarted"
 
 
 def test_run_proactive_tick_skips_non_acted_result(monkeypatch):

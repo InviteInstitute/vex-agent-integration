@@ -1,0 +1,67 @@
+"""The smart-delta engine's live path: workspace XML -> token-efficient
+[Active]/[Orphaned] prompt for the playground panel. Vendored from
+lm-dashboard/tests/test_smart_delta.py."""
+from vex_agent.triggers.smart_delta import generate_llm_prompt_from_project
+
+
+def _project(workspace_xml):
+    import json
+    return json.dumps({"workspace": workspace_xml})
+
+
+def test_none_and_empty_return_none():
+    assert generate_llm_prompt_from_project(None) is None
+    assert generate_llm_prompt_from_project(_project("")) is None
+
+
+def test_hat_block_is_active():
+    xml = '<xml><block type="events_whenStarted" id="a"></block></xml>'
+    out = generate_llm_prompt_from_project(_project(xml))
+    assert "[Active]" in out and "[Orphaned]" in out
+    # the hat block (event handler) is runnable -> appears under Active
+    active = out.split("[Orphaned]")[0]
+    assert "whenStarted" in active
+
+
+def test_non_hat_top_level_block_is_orphaned():
+    xml = '<xml><block type="motor_spin" id="x"></block></xml>'
+    out = generate_llm_prompt_from_project(_project(xml))
+    orphaned = out.split("[Orphaned]")[1]
+    assert "motor_spin" in orphaned or "spin" in orphaned
+
+
+def test_nested_child_renders_indented_under_parent():
+    xml = ('<xml><block type="events_whenStarted" id="a">'
+           '<next><block type="motor_spin" id="b"></block></next></block></xml>')
+    out = generate_llm_prompt_from_project(_project(xml))
+    # child appears at a deeper indent than its parent
+    lines = [ln for ln in out.split("\n") if ln.strip()]
+    parent = next(ln for ln in lines if "whenStarted" in ln)
+    child = next(ln for ln in lines if "spin" in ln)
+    indent = lambda s: len(s) - len(s.lstrip(" "))
+    assert indent(child) > indent(parent)
+
+
+def test_malformed_project_json_returns_none():
+    assert generate_llm_prompt_from_project("not valid json {{") is None
+
+
+def test_malformed_workspace_xml_returns_none():
+    assert generate_llm_prompt_from_project(_project("<xml><unclosed>")) is None
+
+
+def test_fields_and_type_prefix_render_in_prompt():
+    # a hat block carrying a field child, with a strippable VEX type prefix
+    xml = ('<xml><block type="pg_events_whenStarted" id="a">'
+           '<field name="OP">forward</field></block></xml>')
+    out = generate_llm_prompt_from_project(_project(xml))
+    assert "events_whenStarted" in out          # pg_ prefix stripped (clean_type)
+    assert "OP=forward" in out                   # field rendered as (k=v)
+
+
+def test_shadow_blocks_are_skipped():
+    xml = ('<xml><block type="events_whenStarted" id="a">'
+           '<value name="X"><shadow type="math_number" id="s"></shadow></value>'
+           '</block></xml>')
+    out = generate_llm_prompt_from_project(_project(xml))
+    assert "math_number" not in out             # shadows aren't real blocks

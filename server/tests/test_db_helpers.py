@@ -8,7 +8,7 @@ pytestmark = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="needs a l
 
 
 def test_all_students():
-    from src.db import get_conn, all_students
+    from vex_agent.data.db import get_conn, all_students
 
     student = f"test_{uuid4().hex[:8]}"
     try:
@@ -28,7 +28,7 @@ def test_all_students():
 
 
 def test_message_roundtrip_response_lookup_and_feedback():
-    from src.db import (
+    from vex_agent.data.db import (
         get_conn, insert_message, get_message_id_for_response,
         insert_message_feedback,
     )

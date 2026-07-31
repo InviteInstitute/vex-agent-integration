@@ -11,6 +11,7 @@ server/navigator_api_keys.json
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
 venv/
 
@@ -31,3 +32,4 @@ build/
 # Local fetched Invite Hub artifacts
 server/src/invite_hub_sync_state*.json
 server/src/invite_vex_logs*.ndjson
+server/state/

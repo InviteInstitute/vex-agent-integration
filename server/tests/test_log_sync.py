@@ -1,7 +1,7 @@
 """Covers the incremental-sync cursor logic (the lm-dashboard dateFrom port): the
 fetch sends dateFrom, sync state round-trips the timestamp cursor, and the timestamp
 parser tolerates prod's misspelling. Pure -- request_json is monkeypatched, no network."""
-from src import fetch_invite_hub_logs as fh
+from vex_agent.ingest import fetch_invite_hub_logs as fh
 
 
 def test_incremental_fetch_passes_datefrom(monkeypatch):

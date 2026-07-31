@@ -1,7 +1,7 @@
 """Covers llm_service without Ollama: credential loading, the OpenAI client call
 (mocked), length enforcement, and the sanitized generate path."""
-from src import llm_service as ls
-from src.feedback_policy import FeedbackClass
+from vex_agent.llm import client as ls
+from vex_agent.domain.feedback_policy import FeedbackClass
 
 
 def test_load_navigator_credentials_from_env(monkeypatch):
@@ -72,6 +72,7 @@ def test_generate_main_llm_response_sanitizes_and_trims(monkeypatch):
                         lambda **k: 'Encouragement: "You are close. Keep going and try more."')
     out = ls.generate_main_llm_response(
         task="t", student_message="m", available_blocks=["drive"],
+        current_program="when started\ndrive for forward, amount 200",
         robot_behavior_summary="r", recent_messages=[],
         feedback_classes={FeedbackClass.REASSURE},
     )

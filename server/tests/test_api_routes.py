@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 
 def test_health():
-    from src.app import app
+    from vex_agent.app import app
     with TestClient(app) as client:  # context manager runs lifespan (start/stop daemon)
         resp = client.get("/health")
     assert resp.status_code == 200
@@ -12,8 +12,8 @@ def test_health():
 
 
 def test_admin_tick_endpoint(monkeypatch):
-    import src.routes.admin as admin
-    from src.app import app
+    import vex_agent.api.admin as admin
+    from vex_agent.app import app
 
     monkeypatch.setattr(
         admin, "run_proactive_tick",
@@ -29,7 +29,7 @@ def test_admin_tick_endpoint(monkeypatch):
 
 
 def test_admin_tick_requires_fields():
-    from src.app import app
+    from vex_agent.app import app
     with TestClient(app) as client:
         resp = client.post("/admin/tick", json={"student_id": "s"})  # missing session_id
     assert resp.status_code == 422
