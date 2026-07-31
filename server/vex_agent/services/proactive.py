@@ -3,6 +3,7 @@ trigger engine (server/src/triggers/). The engine stays framework/DB-free; this
 module does the adapting so the coupling points one way (app -> engine)."""
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -20,6 +21,9 @@ from vex_agent.data.db import (
 from vex_agent.domain.feedback_policy import FeedbackClass
 from vex_agent.services.sessions import append_session_message
 from vex_agent.services.feedback import generate_feedback
+from vex_agent.services.identity import track_identity_switches
+
+log = logging.getLogger(__name__)
 
 
 # Seed table (from the spike). Only wheel_spin is ACTED on in v1; the rest are
@@ -265,6 +269,10 @@ def run_proactive_tick(student_id: str, session_id: str, playground: str | None 
     acted. Returns what was detected and what was acted on. This is the Slice-1
     capstone the /admin/tick endpoint and (later) the daemon both call."""
     playground = playground or DEFAULT_PLAYGROUND
+    try:  # additive: identity-switch tracking must never break the feedback lane
+        track_identity_switches(student_id, session_id)
+    except Exception as error:
+        log.warning("identity-switch tracking failed for %s: %s", student_id, error)
     new_triggers = persist_new_triggers(student_id, session_id)
     acted = []
     for fire in new_triggers:

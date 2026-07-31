@@ -299,8 +299,68 @@ def record_switch(
                 INSERT INTO event_logs.switch_events
                     (student_id, session_id, switch_kind, from_value, to_value)
                 VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (student_id, session_id, switch_kind, from_value, to_value)
+                DO NOTHING
                 """,
                 (student_id, session_id, switch_kind, from_value, to_value),
+            )
+
+
+def latest_identity(student_id: str) -> tuple[str, str | None, datetime] | None:
+    """The (student_id spelling, class_code, event_ts) of this spelling's most recent
+    event, or None if it has no telemetry."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT student_id, class_code, event_ts
+                FROM event_logs.parsed_events
+                WHERE student_id = %s
+                ORDER BY event_ts DESC, id DESC
+                LIMIT 1
+                """,
+                (student_id,),
+            )
+            row = cur.fetchone()
+            return (row[0], row[1], row[2]) if row else None
+
+
+def get_identity_state(canon: str) -> tuple[str, str | None, datetime] | None:
+    """Last-seen (student_id, class_code, event_ts) for a canonical student, or None."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT last_student_id, last_class_code, last_event_ts
+                FROM event_logs.student_identity
+                WHERE canon_id = %s
+                """,
+                (canon,),
+            )
+            row = cur.fetchone()
+            return (row[0], row[1], row[2]) if row else None
+
+
+def upsert_identity_state(
+    *, canon: str, student_id: str, class_code: str | None, event_ts: datetime,
+) -> None:
+    """Advance a canonical student's last-seen identity -- forward in event time only,
+    so re-processing an older or equal event can't move the pointer backward."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO event_logs.student_identity
+                    (canon_id, last_student_id, last_class_code, last_event_ts)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (canon_id) DO UPDATE SET
+                    last_student_id = EXCLUDED.last_student_id,
+                    last_class_code = EXCLUDED.last_class_code,
+                    last_event_ts = EXCLUDED.last_event_ts,
+                    updated_at = NOW()
+                WHERE event_logs.student_identity.last_event_ts < EXCLUDED.last_event_ts
+                """,
+                (canon, student_id, class_code, event_ts),
             )
 
 
