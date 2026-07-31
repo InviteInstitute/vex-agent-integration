@@ -10,11 +10,6 @@ from uuid import UUID, uuid4
 from vex_agent.config import DEFAULT_PLAYGROUND
 from vex_agent.domain.metrics import EventRecord
 from vex_agent.data.db import fetch_events_from_db
-from vex_agent.domain.context_builder import (
-    build_raw_logs_context,
-    build_current_program,
-    build_episode_summary,
-)
 from vex_agent.triggers.run_sequence import compute_run_edit_distances
 from vex_agent.triggers.detectors import detect_run_triggers_by_playground
 from vex_agent.triggers.constants import INACTIVE_TRIGGER_SECONDS, RE_ALERT_SECONDS, TRIGGER_LABELS
@@ -23,9 +18,8 @@ from vex_agent.data.db import (
     latest_inactive_trigger, resolve_open_inactive_triggers,
 )
 from vex_agent.domain.feedback_policy import FeedbackClass
-from vex_agent.domain.catalogs import resolve_task_description, resolve_available_blocks
-from vex_agent.services.sessions import get_recent_session_messages, append_session_message
-from vex_agent.llm.client import generate_robot_behavior_summary, generate_main_llm_response
+from vex_agent.services.sessions import append_session_message
+from vex_agent.services.feedback import generate_feedback
 
 
 # Seed table (from the spike). Only wheel_spin is ACTED on in v1; the rest are
@@ -252,27 +246,16 @@ def generate_proactive_response(
     if not feedback_classes:
         return None
 
-    playground = playground or DEFAULT_PLAYGROUND
-    task = resolve_task_description(playground)
-    available_blocks = resolve_available_blocks(playground)
-    raw_logs = build_raw_logs_context(student_id=student_id, session_id=session_id)
-    episode_summary = build_episode_summary(student_id=student_id, session_id=session_id)
-    if episode_summary:
-        raw_logs = f"{episode_summary}\n{raw_logs}"
-    current_program = build_current_program(student_id=student_id, session_id=session_id)
-    robot_behavior = generate_robot_behavior_summary(task=task, raw_logs=raw_logs)["response_text"]
     neutral_fact = _NEUTRAL_FACT.get(trigger_type, "The student may need a check-in.")
-    grounded_summary = f"{robot_behavior}\n\n{neutral_fact}"
-
-    return generate_main_llm_response(
-        task=task,
-        student_message="",
-        available_blocks=available_blocks,
-        current_program=current_program,
-        robot_behavior_summary=grounded_summary,
-        recent_messages=get_recent_session_messages(student_id, playground, session_id),
+    result = generate_feedback(
+        student_id=student_id,
+        session_id=session_id,
+        playground=playground or DEFAULT_PLAYGROUND,
         feedback_classes=feedback_classes,
+        student_message="",           # no student turn on the proactive lane
+        behavior_fact=neutral_fact,    # neutral fact, never the internal trigger label
     )
+    return result["llm_request"]
 
 
 def run_proactive_tick(student_id: str, session_id: str, playground: str | None = None) -> dict:

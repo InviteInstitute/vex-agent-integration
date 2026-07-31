@@ -5,16 +5,10 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, HTTPException
 
 from vex_agent.config import DEFAULT_PLAYGROUND
-from vex_agent.domain.catalogs import resolve_available_blocks
 from vex_agent.domain.metrics import (
     compute_snapshot_for_student_session,
     has_active_project_run,
     select_current_playground_segment,
-)
-from vex_agent.domain.context_builder import (
-    build_current_program,
-    build_episode_summary,
-    build_raw_logs_context,
 )
 from vex_agent.data.db import (
     fetch_events_from_db,
@@ -24,7 +18,7 @@ from vex_agent.data.db import (
     insert_message_feedback,
 )
 from vex_agent.domain.feedback_policy import FeedbackClass, determine_feedback_class
-from vex_agent.llm.client import generate_main_llm_response, generate_robot_behavior_summary
+from vex_agent.services.feedback import generate_feedback
 from vex_agent.services.logsync import sync_invite_hub_logs
 from vex_agent.api.schemas import (
     FeedbackRequest,
@@ -35,7 +29,7 @@ from vex_agent.api.schemas import (
     StudentResponseRequest,
     StudentResponseResponse,
 )
-from vex_agent.services.sessions import append_session_message, get_recent_session_messages
+from vex_agent.services.sessions import append_session_message
 from vex_agent.domain.catalogs import resolve_task_description
 
 router = APIRouter(prefix="/v1", tags=["students"])
@@ -192,10 +186,6 @@ def create_response(
     feedback_classes = set()
     synced_log_count = 0
     task = resolve_task_description(resolved_playground)
-    available_blocks = resolve_available_blocks(resolved_playground)
-    raw_logs = "None"
-    robot_behavior_summary = "None"
-    recent_messages: list[dict[str, str]] = []
 
     # Refresh event logs — always pull so feedback reflects the student's newest run
     sync_invite_hub_logs(student_id=student_id)
@@ -253,27 +243,6 @@ def create_response(
             feedback_classes = determine_feedback_class(snapshot)
             if not feedback_classes:
                 feedback_classes = {FeedbackClass.QUESTION}
-            raw_logs = build_raw_logs_context(
-                student_id=student_id,
-                session_id=resolved_session_id,
-            )
-            episode_summary = build_episode_summary(
-                student_id=student_id,
-                session_id=resolved_session_id,
-                events=events,
-            )
-            if episode_summary:
-                raw_logs = f"{episode_summary}\n{raw_logs}"
-            current_program = build_current_program(
-                student_id=student_id,
-                session_id=resolved_session_id,
-                events=events,
-            )
-            recent_messages = get_recent_session_messages(
-                student_id,
-                resolved_playground,
-                resolved_session_id,
-            )
             log_stage(
                 "Feedback Policy Output",
                 student_id=student_id,
@@ -286,11 +255,16 @@ def create_response(
 
     if task and payload.student_message and feedback_classes:
         try:
-            robot_behavior_request = generate_robot_behavior_summary(
-                task=task,
-                raw_logs=raw_logs,
+            result = generate_feedback(
+                student_id=student_id,
+                session_id=resolved_session_id,
+                playground=resolved_playground,
+                feedback_classes=feedback_classes,
+                student_message=payload.student_message,
+                events=events,
             )
-            robot_behavior_summary = robot_behavior_request["response_text"]
+            llm_request = result["llm_request"]
+            robot_behavior_request = result["robot_behavior_request"]
             log_stage(
                 "Robot Behavior Prompt Sent",
                 student_id=student_id,
@@ -302,25 +276,7 @@ def create_response(
                 "Robot Behavior Output",
                 student_id=student_id,
                 session_id=resolved_session_id,
-                behavior_summary=robot_behavior_summary,
-            )
-            log_stage(
-                "LLM Request Starting",
-                student_id=student_id,
-                session_id=resolved_session_id,
-                model=robot_behavior_request["model"],
-                feedback_classes=sorted(
-                    feedback_class.value for feedback_class in feedback_classes
-                ),
-            )
-            llm_request = generate_main_llm_response(
-                task=task,
-                student_message=payload.student_message,
-                available_blocks=available_blocks,
-                current_program=current_program,
-                robot_behavior_summary=robot_behavior_summary,
-                recent_messages=recent_messages,
-                feedback_classes=feedback_classes,
+                behavior_summary=result["robot_behavior_summary"],
             )
             log_stage(
                 "LLM Prompt Sent",
