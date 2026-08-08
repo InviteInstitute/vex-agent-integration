@@ -139,7 +139,7 @@ Any instruct model you have pulled works. Avoid reasoning models that emit `<thi
 
 ## Proactive Trigger Agent
 
-The agent can reach out on its own. It watches the VEX log stream, measures how a student's code changes between runs, and detects behavioral triggers (wheel-spinning, resilience, explorer, step-by-step, inactive). When one fires, it pushes a short piece of feedback without waiting for the student to ask. Design notes are in [docs/superpowers/specs/2026-07-14-proactive-triggers-design.md](docs/superpowers/specs/2026-07-14-proactive-triggers-design.md).
+The agent can reach out on its own. It watches the VEX log stream, measures how a student's code changes between runs, and detects behavioral triggers (wheel-spinning, resilience, explorer, step-by-step, inactive). When one fires, it pushes a short piece of feedback without waiting for the student to ask. Design notes are in [docs/concepts/proactive-triggers.md](docs/concepts/proactive-triggers.md).
 
 Proactive messages reuse the normal feedback pipeline, so they share the same pedagogy as replies to a typed question. They are saved to `chat.messages` with `origin = 'proactive'` and delivered to the browser over Server-Sent Events.
 
