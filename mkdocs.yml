@@ -1,0 +1,69 @@
+site_name: VEX Pedagogical Agent
+site_description: A pedagogical AI agent that gives VEXcode VR students grounded, in-the-moment feedback on their block code.
+site_url: https://inviteinstitute.github.io/vex-agent-integration/
+docs_dir: docs
+dev_addr: localhost:4100
+repo_url: https://github.com/InviteInstitute/vex-agent-integration
+repo_name: InviteInstitute/vex-agent-integration
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - toc.follow
+    - search.suggest
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Concepts:
+      - Architecture: concepts/architecture.md
+      - Feedback pipeline: concepts/feedback-pipeline.md
+      - Proactive triggers: concepts/proactive-triggers.md
+      - Data model: concepts/data-model.md
+  - Guides:
+      - Configuration: guides/configuration.md
+      - Ingestion: guides/ingestion.md
+      - Deployment: guides/deployment.md
+  - Reference:
+      - API reference: reference/api.md
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - tables
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+
+validation:
+  links:
+    anchors: warn
