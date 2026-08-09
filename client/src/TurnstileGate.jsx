@@ -82,7 +82,8 @@ export default function TurnstileGate() {
         alignItems: "center",
         justifyContent: "center",
         gap: 16,
-        fontFamily: '"Trebuchet MS", "Avenir Next", sans-serif',
+        fontFamily:
+          '"Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
         color: "#213246",
       }}
     >
