@@ -42,6 +42,7 @@ nav:
       - Configuration: guides/configuration.md
       - Ingestion: guides/ingestion.md
       - Deployment: guides/deployment.md
+      - Development: guides/development.md
   - Reference:
       - API reference: reference/api.md
 

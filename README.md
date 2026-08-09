@@ -25,8 +25,11 @@ are needed to see it work.
 
 ```bash
 cp .env.example .env       # set POSTGRES_PASSWORD and point OPENAI_* at an LLM
-docker compose up --build  # API on :8001, Postgres on :5433
+make dev                   # (or: docker compose up --build) API on :8001, Postgres on :5433
 ```
+
+`make` (or `make help`) lists the shared command vocabulary — `dev`, `test`, `lint`,
+`format`, `build`, `deploy`. See the [Development](https://inviteinstitute.github.io/vex-agent-integration/guides/development/) docs.
 
 Then apply the schema and load a bundled fixture so there's real telemetry to ground on:
 
@@ -69,8 +72,9 @@ the agent's read of a student stays comparable to the researcher dashboard's.
 Production runs the same `compose.yml` (Postgres + the API, with the proactive daemon
 in-process). The API binds to `127.0.0.1:8001` so **nginx** sits in front of it, serving
 the built client from `client/dist` and proxying `/v1`, `/admin`, and `/healthz`.
-`scripts/deploy.sh` is the whole rollout: it guards a dirty tree, pulls, rolls the stack,
-applies the migrations, and gates on `/healthz`. See the
+`make deploy` is the whole rollout: `scripts/deploy.sh` guards a dirty tree, pulls, rolls
+the stack, applies the migrations, and gates on `/healthz`, then the client is rebuilt.
+See the
 [Deployment](https://inviteinstitute.github.io/vex-agent-integration/guides/deployment/)
 docs.
 

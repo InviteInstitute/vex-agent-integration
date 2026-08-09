@@ -34,10 +34,11 @@ NAVIGATOR_MODEL=llama3.2:latest
 ## Run The Stack
 
 ```bash
-docker compose up --build
+docker compose up --build   # or: make dev
 ```
 
-That starts two services.
+`make dev` is the shortcut and behaves the same. See [Development](guides/development.md)
+for the full make vocabulary. That starts two services.
 
 | Service | Address | Notes |
 |---|---|---|
@@ -87,7 +88,7 @@ When you want reload-on-save on the API, run it in a venv instead.
 ```bash
 cd server
 python3 -m venv .venv && source .venv/bin/activate
-pip install -e '.[dev]'
+pip install -e '.[dev]'                                # or, from the repo root: make install
 uvicorn vex_agent.app:app --reload --log-level info   # :8000
 ```
 
@@ -130,5 +131,11 @@ anything under `docs/`.
     ---
 
     Every environment variable, plus NaviGator and Ollama setups.
+
+-   :material-wrench:{ .lg .middle } **[Development](guides/development.md)**
+
+    ---
+
+    The make targets, the ruff and prettier style, the tests, and CI.
 
 </div>

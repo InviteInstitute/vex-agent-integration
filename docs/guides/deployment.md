@@ -19,15 +19,17 @@ flowchart LR
 
 ## One-Command Deploy
 
-`scripts/deploy.sh` is the whole rollout. It refuses to run over a dirty tree, does a
-fast-forward pull, rebuilds and rolls the stack, applies the migrations, and gates on
-the health check.
+`scripts/deploy.sh` is the whole backend rollout. It refuses to run over a dirty tree,
+does a fast-forward pull, rebuilds and rolls the stack, applies the migrations, and gates
+on the health check.
 
 ```bash
-scripts/deploy.sh
+make deploy      # or: scripts/deploy.sh && npm --prefix client run build
 ```
 
-What it does, in order:
+`make deploy` runs the script and then rebuilds the client, since nginx serves the client
+from `client/dist` rather than the API (see [The Client Build](#the-client-build)). Under
+the hood the script does, in order:
 
 1. Aborts if there are uncommitted changes to tracked files, so a pull never clobbers edits.
 2. `git pull --ff-only`.
