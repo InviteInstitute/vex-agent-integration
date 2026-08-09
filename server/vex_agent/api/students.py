@@ -56,7 +56,10 @@ def maybe_sync_invite_hub_logs(student_id: str) -> int:
     now = monotonic()
     if last_sync_at is not None and now - last_sync_at < SYNC_COOLDOWN_S:
         return 0
-    synced_count = sync_invite_hub_logs(student_id=student_id)
+    # cursor-neutral: a per-student freshness fetch must not advance the global
+    # ingest cursor (that's owned by the daemon / boot warm-up), or it would skip
+    # other students' unsynced rows. Idempotent inserts make the re-fetch a no-op.
+    synced_count = sync_invite_hub_logs(student_id=student_id, advance_cursor=False)
     _last_sync_at[student_id] = now
     return synced_count
 
@@ -165,8 +168,10 @@ def create_response(
     synced_log_count = 0
     task = resolve_task_description(resolved_playground)
 
-    # Refresh event logs — always pull so feedback reflects the student's newest run
-    sync_invite_hub_logs(student_id=student_id)
+    # Refresh event logs — always pull so feedback reflects the student's newest run.
+    # cursor-neutral (see maybe_sync_invite_hub_logs): freshness for this student only,
+    # never advancing the global ingest cursor the daemon owns.
+    sync_invite_hub_logs(student_id=student_id, advance_cursor=False)
 
     if task and payload.student_message:
         try:
