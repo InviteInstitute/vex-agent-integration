@@ -29,7 +29,8 @@ build/
 *.log
 .run/
 
-# Local fetched Invite Hub artifacts
-server/src/invite_hub_sync_state*.json
-server/src/invite_vex_logs*.ndjson
+# Local fetched Invite Hub artifacts (DEFAULT_STATE_PATH / DEFAULT_OUTPUT_PATH
+# resolve next to the ingest module; server/state/ holds the prod-mounted cursor)
+server/vex_agent/ingest/invite_hub_sync_state*.json
+server/vex_agent/ingest/invite_vex_logs*.ndjson
 server/state/
