@@ -2,15 +2,14 @@
 guard that stops a stale writer from moving the cursor backward. DB-gated,
 self-cleaning, and scoped to a unique cursor name so it never touches the real
 'invite_hub' row."""
+
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    not os.getenv("DATABASE_URL"), reason="needs a live DATABASE_URL"
-)
+pytestmark = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="needs a live DATABASE_URL")
 
 
 def _delete(name: str) -> None:
@@ -25,8 +24,8 @@ def test_cursor_roundtrip_and_forward_only():
     from vex_agent.data.db import get_ingest_cursor, save_ingest_cursor
 
     name = f"test_{uuid4().hex[:8]}"
-    t1 = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    t2 = datetime(2026, 2, 1, tzinfo=timezone.utc)
+    t1 = datetime(2026, 1, 1, tzinfo=UTC)
+    t2 = datetime(2026, 2, 1, tzinfo=UTC)
     try:
         assert get_ingest_cursor(name) == {}  # unseeded
 

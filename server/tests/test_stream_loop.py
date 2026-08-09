@@ -1,5 +1,6 @@
 """Drives the SSE event generator (covers routes/stream.py _event_stream + endpoint)
 without a live server or DB."""
+
 import asyncio
 
 from vex_agent.api import stream as S

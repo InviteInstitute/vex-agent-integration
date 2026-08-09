@@ -6,6 +6,7 @@ verified server-side against Cloudflare's siteverify, and success is remembered
 via a signed cookie for COOKIE_MAX_AGE seconds, so solving is a one-time cost per
 browser rather than per request.
 """
+
 import os
 
 import httpx
@@ -31,11 +32,14 @@ _signer = TimestampSigner(SESSION_SECRET)
 async def verify_turnstile(token, remote_ip):
     """True iff Cloudflare accepts this widget response token."""
     async with httpx.AsyncClient(timeout=5.0) as client:
-        resp = await client.post(SITEVERIFY_URL, data={
-            "secret": TURNSTILE_SECRET,
-            "response": token,
-            "remoteip": remote_ip,
-        })
+        resp = await client.post(
+            SITEVERIFY_URL,
+            data={
+                "secret": TURNSTILE_SECRET,
+                "response": token,
+                "remoteip": remote_ip,
+            },
+        )
     return resp.status_code == 200 and resp.json().get("success") is True
 
 

@@ -4,13 +4,16 @@ things like `"Encouragement: Loops can be tricky."`, wrapping quotes, and a
 `"Student,"` vocative -- all of which the OUTPUT RULES forbid but which survive
 length trimming. Conservative on purpose: it only removes leak signatures, never
 real sentence content."""
+
 import re
 
 # A leading "Label:" prefix -- a single capitalized word (or two) then a colon.
 # One-sentence feedback almost never legitimately opens "Word:", so this is safe.
 _LEADING_LABEL = re.compile(r"^\s*[A-Z][A-Za-z]+(?:\s+[A-Za-z]+)?:\s*")
 # A leading vocative the model sometimes prepends.
-_LEADING_VOCATIVE = re.compile(r"^\s*(?:hi\s+student|hey\s+student|student)\s*[,:]\s*", re.IGNORECASE)
+_LEADING_VOCATIVE = re.compile(
+    r"^\s*(?:hi\s+student|hey\s+student|student)\s*[,:]\s*", re.IGNORECASE
+)
 _WRAP_CHARS = "\"'`"
 
 

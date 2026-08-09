@@ -1,5 +1,6 @@
 """build_situation_model: deterministic grounding rendering -- measured facts only,
 no LLM call, no raw-log dump. Snapshot is faked so this tests the rendering/phrasing."""
+
 from types import SimpleNamespace
 
 from vex_agent.domain import context_builder as cb
@@ -26,6 +27,7 @@ def test_empty_events_returns_none():
 def test_non_go_mars_playground_degrades_to_none(monkeypatch):
     def boom(events):
         raise ValueError("progress metric only configured for GO-Mars")
+
     monkeypatch.setattr(cb, "analyze_current_state", boom)
     assert cb.build_situation_model([object()]) == "None"
 
@@ -34,17 +36,19 @@ def test_renders_measured_facts_not_raw_logs(monkeypatch):
     monkeypatch.setattr(cb, "analyze_current_state", lambda events: _snapshot())
     events = [
         SimpleNamespace(event_type="runProject", error_message=None, playground_data_json=None),
-        SimpleNamespace(event_type="runProject", error_message="Robot hit a wall", playground_data_json=None),
+        SimpleNamespace(
+            event_type="runProject", error_message="Robot hit a wall", playground_data_json=None
+        ),
     ]
     out = cb.build_situation_model(events)
     assert "Goal progress: 45% (going up)." in out
     assert "2 run(s)" in out
     assert "6 min" in out
-    assert "trying many quick changes" in out             # cognition phrase
-    assert "persistently" in out                           # persistence phrase
+    assert "trying many quick changes" in out  # cognition phrase
+    assert "persistently" in out  # persistence phrase
     assert "paused to watch the result 2 time(s)" in out
-    assert "Robot hit a wall" in out                       # last error, verbatim
-    assert "runProject" not in out                         # never a raw event dump
+    assert "Robot hit a wall" in out  # last error, verbatim
+    assert "runProject" not in out  # never a raw event dump
 
 
 def test_milestones_rendered_from_playground_parameters(monkeypatch):
@@ -61,8 +65,11 @@ def test_milestones_rendered_from_playground_parameters(monkeypatch):
     }
     events = [
         SimpleNamespace(event_type="runProject", error_message=None, playground_data_json=None),
-        SimpleNamespace(event_type="playgroundData", error_message=None,
-                        playground_data_json={"parameters": params}),
+        SimpleNamespace(
+            event_type="playgroundData",
+            error_message=None,
+            playground_data_json={"parameters": params},
+        ),
     ]
     out = cb.build_situation_model(events)
     assert "Milestones done:" in out

@@ -1,6 +1,7 @@
 """Covers the incremental-sync cursor logic (the lm-dashboard dateFrom port): the
 fetch sends dateFrom, sync state round-trips the timestamp cursor, and the timestamp
 parser tolerates prod's misspelling. Pure -- request_json is monkeypatched, no network."""
+
 from vex_agent.ingest import fetch_invite_hub_logs as fh
 
 
@@ -13,7 +14,11 @@ def test_incremental_fetch_passes_datefrom(monkeypatch):
 
     monkeypatch.setattr(fh, "request_json", fake_request_json)
     fh.fetch_vex_logs_incremental(
-        "http://h", "t", "", page_size=500, last_source_log_id=10,
+        "http://h",
+        "t",
+        "",
+        page_size=500,
+        last_source_log_id=10,
         date_from="2026-07-21T00:00:00+00:00",
     )
     assert "dateFrom=" in seen["url"]
@@ -21,8 +26,9 @@ def test_incremental_fetch_passes_datefrom(monkeypatch):
 
 def test_incremental_fetch_omits_datefrom_when_none(monkeypatch):
     seen = {}
-    monkeypatch.setattr(fh, "request_json",
-                        lambda url, token=None: seen.update(url=url) or {"results": []})
+    monkeypatch.setattr(
+        fh, "request_json", lambda url, token=None: seen.update(url=url) or {"results": []}
+    )
     fh.fetch_vex_logs_incremental("http://h", "t", "", page_size=500, last_source_log_id=None)
     assert "dateFrom=" not in seen["url"]
 

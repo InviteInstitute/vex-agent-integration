@@ -6,6 +6,7 @@ chat.messages for new origin='proactive' rows for the student and emits them as
 blocking DB reads run in a thread so the event loop stays free. Swap to pub/sub
 only past ~50 concurrent students.
 """
+
 import asyncio
 import json
 
@@ -13,7 +14,9 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from vex_agent.data.db import (
-    latest_proactive_message_id, get_proactive_messages_after, proactive_rev,
+    get_proactive_messages_after,
+    latest_proactive_message_id,
+    proactive_rev,
 )
 
 router = APIRouter(prefix="/v1", tags=["stream"])

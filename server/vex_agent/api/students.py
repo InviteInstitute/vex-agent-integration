@@ -4,22 +4,6 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException
 
-from vex_agent.config import DEFAULT_PLAYGROUND
-from vex_agent.domain.metrics import (
-    compute_snapshot_for_student_session,
-    has_active_project_run,
-    select_current_playground_segment,
-)
-from vex_agent.data.db import (
-    fetch_events_from_db,
-    get_latest_session_id_for_student,
-    get_message_id_for_response,
-    insert_message,
-    insert_message_feedback,
-)
-from vex_agent.domain.feedback_policy import FeedbackClass, determine_feedback_class
-from vex_agent.services.feedback import generate_feedback
-from vex_agent.services.logsync import sync_invite_hub_logs
 from vex_agent.api.schemas import (
     FeedbackRequest,
     FeedbackResponse,
@@ -29,8 +13,24 @@ from vex_agent.api.schemas import (
     StudentResponseRequest,
     StudentResponseResponse,
 )
-from vex_agent.services.sessions import append_session_message
+from vex_agent.config import DEFAULT_PLAYGROUND
+from vex_agent.data.db import (
+    fetch_events_from_db,
+    get_latest_session_id_for_student,
+    get_message_id_for_response,
+    insert_message,
+    insert_message_feedback,
+)
 from vex_agent.domain.catalogs import resolve_task_description
+from vex_agent.domain.feedback_policy import FeedbackClass, determine_feedback_class
+from vex_agent.domain.metrics import (
+    compute_snapshot_for_student_session,
+    has_active_project_run,
+    select_current_playground_segment,
+)
+from vex_agent.services.feedback import generate_feedback
+from vex_agent.services.logsync import sync_invite_hub_logs
+from vex_agent.services.sessions import append_session_message
 
 router = APIRouter(prefix="/v1", tags=["students"])
 logger = logging.getLogger(__name__)
@@ -110,6 +110,7 @@ def resolve_session(student_id: str) -> SessionResolutionResponse:
         playground=current_playground,
         status="resolved",
     )
+
 
 @router.post("/students/{student_id}/messages", response_model=MessageResponse)
 def create_message(student_id: str, payload: MessageRequest) -> MessageResponse:

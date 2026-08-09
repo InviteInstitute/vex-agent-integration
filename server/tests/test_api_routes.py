@@ -1,10 +1,12 @@
 """HTTP-surface tests via FastAPI TestClient (covers app.py + lifespan + routes/admin.py).
 No DB/Ollama: run_proactive_tick is patched in the admin route's namespace."""
+
 from fastapi.testclient import TestClient
 
 
 def test_health():
     from vex_agent.app import app
+
     with TestClient(app) as client:  # context manager runs lifespan (start/stop daemon)
         resp = client.get("/healthz")
     assert resp.status_code == 200
@@ -16,9 +18,11 @@ def test_admin_tick_endpoint(monkeypatch):
     from vex_agent.app import app
 
     monkeypatch.setattr(
-        admin, "run_proactive_tick",
+        admin,
+        "run_proactive_tick",
         lambda student_id, session_id, playground=None: {
-            "detected": [], "acted": [{"trigger_type": "wheel_spin", "message": "hi"}],
+            "detected": [],
+            "acted": [{"trigger_type": "wheel_spin", "message": "hi"}],
         },
     )
     with TestClient(app) as client:
@@ -30,6 +34,7 @@ def test_admin_tick_endpoint(monkeypatch):
 
 def test_admin_tick_requires_fields():
     from vex_agent.app import app
+
     with TestClient(app) as client:
         resp = client.post("/admin/tick", json={"student_id": "s"})  # missing session_id
     assert resp.status_code == 422

@@ -2,6 +2,7 @@
 persist -> SSE-poll delivery, then dedup on a second tick. DB-backed but prod/Ollama-free
 (sync and LLM are monkeypatched). Uses fixture_07_1 (12 identical reruns -> wheel_spin;
 old events -> inactive). Cleans up."""
+
 import os
 
 import pytest
@@ -15,6 +16,7 @@ STUDENT = "fixture_07_1"
 
 def _cleanup():
     from vex_agent.data.db import get_conn
+
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM chat.messages WHERE student_id=%s", (STUDENT,))
@@ -22,14 +24,16 @@ def _cleanup():
 
 
 def test_daemon_scopes_generates_delivers_and_dedups(monkeypatch):
-    from vex_agent.services import daemon as td, proactive as trigger_service
-    from vex_agent.data.db import latest_proactive_message_id, get_proactive_messages_after
+    from vex_agent.data.db import get_proactive_messages_after, latest_proactive_message_id
+    from vex_agent.services import daemon as td
+    from vex_agent.services import proactive as trigger_service
 
     # pin scope to just this fixture so the tick doesn't fan out to every student
     monkeypatch.setattr(td, "in_scope_students", lambda: {STUDENT})
     monkeypatch.setattr(td, "sync_invite_hub_logs", lambda *a, **k: 0)
     monkeypatch.setattr(
-        trigger_service, "generate_proactive_response",
+        trigger_service,
+        "generate_proactive_response",
         lambda *a, **k: {"response_text": "Try changing one block.", "model": "t", "prompt": "p"},
     )
 

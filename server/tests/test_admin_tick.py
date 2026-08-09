@@ -4,8 +4,8 @@ DB-backed but Ollama-free: the LLM generation is monkeypatched to a canned messa
 so this verifies the detect -> persist -> deliver -> mark-acted wiring, not model
 quality. Uses fixture_07_1 (12 identical reruns -> a natural wheel_spin). Cleans up.
 """
+
 import os
-from uuid import uuid4
 
 import pytest
 
@@ -18,6 +18,7 @@ STUDENT = "fixture_07_1"
 
 def _session_for(student):
     from vex_agent.data.db import get_conn
+
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -31,15 +32,18 @@ def _session_for(student):
 
 def _cleanup(student):
     from vex_agent.data.db import get_conn
+
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM chat.messages WHERE student_id=%s AND origin='proactive'", (student,))
+            cur.execute(
+                "DELETE FROM chat.messages WHERE student_id=%s AND origin='proactive'", (student,)
+            )
             cur.execute("DELETE FROM event_logs.agent_triggers WHERE student_id=%s", (student,))
 
 
 def test_tick_detects_persists_and_delivers_wheel_spin(monkeypatch):
-    from vex_agent.services import proactive as trigger_service
     from vex_agent.data.db import get_conn
+    from vex_agent.services import proactive as trigger_service
 
     session_id = _session_for(STUDENT)
     assert session_id is not None
@@ -47,9 +51,13 @@ def test_tick_detects_persists_and_delivers_wheel_spin(monkeypatch):
 
     # canned generation -- no Ollama in the test path
     monkeypatch.setattr(
-        trigger_service, "generate_proactive_response",
-        lambda *a, **k: {"response_text": "Try changing one block before you run again.",
-                         "model": "test", "prompt": "test"},
+        trigger_service,
+        "generate_proactive_response",
+        lambda *a, **k: {
+            "response_text": "Try changing one block before you run again.",
+            "model": "test",
+            "prompt": "test",
+        },
     )
     try:
         result = trigger_service.run_proactive_tick(STUDENT, session_id)

@@ -2,14 +2,17 @@
 
 Run from server/:  PYTHONPATH=. ../.venv/bin/python -m pytest tests/test_triggers.py
 """
+
+from vex_agent.triggers.ast_builder import extract_workspace_xml, xml_to_block_ast
 from vex_agent.triggers.detectors import detect_run_triggers, detect_run_triggers_by_playground
 from vex_agent.triggers.distance import cached_edit_distance, compute_edit_distance
-from vex_agent.triggers.ast_builder import xml_to_block_ast, extract_workspace_xml
 
 XMLNS = 'xmlns="https://developers.google.com/blockly/xml"'
 WS_ONE = f'<xml {XMLNS}><block type="pg_events_when_started" id="s"></block></xml>'
-WS_TWO = (f'<xml {XMLNS}><block type="pg_events_when_started" id="s">'
-          f'<next><block type="pg_drivetrain_drive_for" id="d"></block></next></block></xml>')
+WS_TWO = (
+    f'<xml {XMLNS}><block type="pg_events_when_started" id="s">'
+    f'<next><block type="pg_drivetrain_drive_for" id="d"></block></next></block></xml>'
+)
 
 
 def _fire_types(seq):
@@ -61,8 +64,9 @@ def test_extract_workspace_xml_from_project_json_string():
 
 def test_by_playground_resets_counters_on_switch():
     # 3 zeros on pg A, then pg B: the streak must not carry across the switch
-    runs = ([{"index": i, "edit_distance": 0, "ts": None, "playground": "A"} for i in range(3)]
-            + [{"index": i + 3, "edit_distance": 0, "ts": None, "playground": "B"} for i in range(3)])
+    runs = [{"index": i, "edit_distance": 0, "ts": None, "playground": "A"} for i in range(3)] + [
+        {"index": i + 3, "edit_distance": 0, "ts": None, "playground": "B"} for i in range(3)
+    ]
     assert "wheel_spin" not in [t[0] for t in detect_run_triggers_by_playground(runs)]
 
 

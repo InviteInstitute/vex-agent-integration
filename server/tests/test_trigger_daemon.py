@@ -1,6 +1,7 @@
 """Tests for the daemon scope (now: every student with telemetry). All monkeypatched --
 no DB, no Ollama, no prod. The properties (scope is all_students, no prod hit when there
 is no telemetry) are the point."""
+
 from vex_agent.services import daemon as td
 
 
@@ -44,7 +45,10 @@ def test_acts_when_scoped(monkeypatch):
     monkeypatch.setattr(td, "in_scope_students", lambda: {"stu"})
     monkeypatch.setattr(td, "sync_invite_hub_logs", lambda *a, **k: 0)
     monkeypatch.setattr(td, "get_latest_session_id_for_student", lambda s: "sess")
-    monkeypatch.setattr(td, "run_proactive_tick",
-                        lambda s, sid: {"detected": [], "acted": [{"trigger_type": "wheel_spin"}]})
+    monkeypatch.setattr(
+        td,
+        "run_proactive_tick",
+        lambda s, sid: {"detected": [], "acted": [{"trigger_type": "wheel_spin"}]},
+    )
     out = td.run_daemon_tick()
     assert out["scoped"] == 1 and len(out["acted"]) == 1

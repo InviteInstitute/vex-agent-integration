@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "production": "vite serve --host 0.0.0.0 --port 5173",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "format": "prettier --write \"src/**/*.{js,jsx,css}\" index.html",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,css}\" index.html"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -22,6 +24,7 @@
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/coverage-v8": "^2.1.9",
     "jsdom": "^25.0.1",
+    "prettier": "^3.4.2",
     "vite": "^7.0.1",
     "vitest": "^2.1.9"
   }

@@ -284,8 +284,7 @@ button {
   gap: 1rem;
   align-content: start;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(245, 250, 255, 0.96)),
-    #ffffff;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(245, 250, 255, 0.96)), #ffffff;
 }
 
 .message-row {
@@ -472,7 +471,9 @@ button {
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.86);
   color: #23364a;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 
 .feedback-actions button.selected {

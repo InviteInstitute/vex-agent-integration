@@ -29,6 +29,7 @@ class FeedbackClass(Enum):
     REPEAT = "Repeat"
     NEXT_STEP = "Next Step"
 
+
 def determine_feedback_class(snapshot: CurrentStateSnapshot) -> set[FeedbackClass]:
     feedback_classes = set()
     cognition = snapshot.cognition.value
@@ -53,7 +54,7 @@ def determine_feedback_class(snapshot: CurrentStateSnapshot) -> set[FeedbackClas
     # Trial & Error -> a.ii
     if cognition == "TRIAL_AND_ERROR":
         feedback_classes.add(FeedbackClass.PARTIAL_CORRECTNESS)
-        
+
         # -> b.i
         if persistence == "EXPECTED_COMPLETION":
             feedback_classes.add(FeedbackClass.EVIDENCE_BASED_PRAISE)
@@ -68,17 +69,18 @@ def determine_feedback_class(snapshot: CurrentStateSnapshot) -> set[FeedbackClas
 
     # Code abandonment
     if cognition == "CODE_ABANDONMENT":
-
         # -> c.v
         if persistence in {"EXPECTED_COMPLETION", "EARLY_QUITTER"}:
             feedback_classes.add(FeedbackClass.DIAGNOSE)
 
         # -> b.ii, c.vii, c.viii
         if persistence == "HIGH_PERSISTER":
-            feedback_classes.update({
-                FeedbackClass.REASSURE,
-                FeedbackClass.ELABORATE,
-            })
+            feedback_classes.update(
+                {
+                    FeedbackClass.REASSURE,
+                    FeedbackClass.ELABORATE,
+                }
+            )
 
     # Step-by-step elimination -> c.iv
     if cognition == "STEP_BY_STEP_ELIMINATION":

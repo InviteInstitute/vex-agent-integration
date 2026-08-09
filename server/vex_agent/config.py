@@ -1,4 +1,5 @@
 """Centralized configuration: env-backed settings + shared defaults (single source)."""
+
 import os
 
 from dotenv import load_dotenv

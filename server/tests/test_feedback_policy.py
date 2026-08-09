@@ -1,3 +1,4 @@
+from vex_agent.domain.feedback_policy import FeedbackClass, determine_feedback_class
 from vex_agent.domain.metrics import (
     ActionLevel,
     CognitionCategory,
@@ -5,7 +6,6 @@ from vex_agent.domain.metrics import (
     Direction,
     PersistenceCategory,
 )
-from vex_agent.domain.feedback_policy import FeedbackClass, determine_feedback_class
 
 
 def make_snapshot(
@@ -63,9 +63,7 @@ def test_development_decreases_progress():
 
 
 def test_trial_and_error_baseline():
-    result = determine_feedback_class(
-        make_snapshot(cognition=CognitionCategory.TRIAL_AND_ERROR)
-    )
+    result = determine_feedback_class(make_snapshot(cognition=CognitionCategory.TRIAL_AND_ERROR))
     assert result == {FeedbackClass.PARTIAL_CORRECTNESS}
 
 
@@ -76,8 +74,7 @@ def test_trial_and_error_with_expected_completion():
             persistence=PersistenceCategory.EXPECTED_COMPLETION,
         )
     )
-    assert result == {
-        FeedbackClass.PARTIAL_CORRECTNESS, FeedbackClass.EVIDENCE_BASED_PRAISE}
+    assert result == {FeedbackClass.PARTIAL_CORRECTNESS, FeedbackClass.EVIDENCE_BASED_PRAISE}
 
 
 def test_trial_and_error_with_high_persister():
@@ -138,9 +135,7 @@ def test_step_by_step_elimination():
 
 
 def test_snap_n_test():
-    result = determine_feedback_class(
-        make_snapshot(cognition=CognitionCategory.SNAP_N_TEST)
-    )
+    result = determine_feedback_class(make_snapshot(cognition=CognitionCategory.SNAP_N_TEST))
     assert result == {FeedbackClass.INFORM}
 
 

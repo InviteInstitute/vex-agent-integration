@@ -1,0 +1,4 @@
+# Bulk mechanical reformats. Ignored by git blame so history stays readable.
+# Run: git config blame.ignoreRevsFile .git-blame-ignore-revs
+f6c2daef5a675295d2659d1efb1d8ae9fbdc4b96
+81d1e294f81afa26a6014db98a5e4cfdcd0b274c

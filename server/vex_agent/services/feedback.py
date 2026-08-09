@@ -12,6 +12,7 @@ one feedback LLM pass. The only differences are the inputs:
 `feedback_classes` is decided by each caller (reactive: from the snapshot; proactive:
 from the trigger) and passed in.
 """
+
 from vex_agent.data.db import fetch_events_from_db
 from vex_agent.domain.catalogs import resolve_available_blocks, resolve_task_description
 from vex_agent.domain.context_builder import build_current_program, build_situation_model

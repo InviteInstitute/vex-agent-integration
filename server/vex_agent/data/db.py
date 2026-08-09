@@ -4,9 +4,9 @@ from typing import Any
 from uuid import UUID
 
 import psycopg
+from dotenv import load_dotenv
 from psycopg.rows import dict_row
 from psycopg.types.json import Json
-from dotenv import load_dotenv
 
 # Domain models + pure mappers this data layer returns/persists (one-way data -> domain;
 # metrics has no app-level top-level imports, so this can't cycle at import time).
@@ -103,8 +103,13 @@ def insert_agent_trigger_if_new(
                 DO NOTHING
                 RETURNING id
                 """,
-                (student_id, session_id, trigger_type, run_index,
-                 Json(detail) if detail is not None else None),
+                (
+                    student_id,
+                    session_id,
+                    trigger_type,
+                    run_index,
+                    Json(detail) if detail is not None else None,
+                ),
             )
             row = cur.fetchone()
             return row[0] if row else None
@@ -333,7 +338,12 @@ def all_students(recency_hours: float | None = None) -> list[str]:
 
 
 def record_switch(
-    *, student_id: str, session_id: str, switch_kind: str, from_value: str | None, to_value: str | None,
+    *,
+    student_id: str,
+    session_id: str,
+    switch_kind: str,
+    from_value: str | None,
+    to_value: str | None,
 ) -> None:
     """Persist an identity switch (casing flip or classCode change) to switch_events.
     Vendored table from lm-dashboard; additive -- the agent does not act on this yet,
@@ -388,7 +398,11 @@ def get_identity_state(canon: str) -> tuple[str, str | None, datetime] | None:
 
 
 def upsert_identity_state(
-    *, canon: str, student_id: str, class_code: str | None, event_ts: datetime,
+    *,
+    canon: str,
+    student_id: str,
+    class_code: str | None,
+    event_ts: datetime,
 ) -> None:
     """Advance a canonical student's last-seen identity -- forward in event time only,
     so re-processing an older or equal event can't move the pointer backward."""
@@ -423,7 +437,9 @@ def proactive_rev() -> int:
 
 def to_event_record(row: dict[str, Any]) -> EventRecord:
     playground_data_json = (
-        row.get("playground_data_json") if isinstance(row.get("playground_data_json"), dict) else None
+        row.get("playground_data_json")
+        if isinstance(row.get("playground_data_json"), dict)
+        else None
     )
     return EventRecord(
         id=row.get("id"),

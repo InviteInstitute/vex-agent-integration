@@ -1,0 +1,84 @@
+name: CI
+
+# Lint, format-check, and test the backend and frontend on every push to main
+# and every pull request. Mirrors the same workflow in lm-dashboard.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vexagent
+          POSTGRES_PASSWORD: vexagent
+          POSTGRES_DB: vexagent
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vexagent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://vexagent:vexagent@localhost:5432/vexagent
+      TRIGGER_DAEMON_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e '.[dev]' ruff==0.16.2
+
+      - name: Lint
+        run: ruff check vex_agent tests
+
+      - name: Format check
+        run: ruff format --check vex_agent tests
+
+      # The schema is built by the numbered migrations (there is no auto-create on
+      # startup), so apply them in order before the DB-backed tests run.
+      - name: Apply migrations
+        run: |
+          for f in db/migrations/*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+
+      # The integration tests need the sample runs in event_logs.parsed_events.
+      - name: Seed fixtures
+        run: |
+          for f in tests/fixtures/raw_logs/*.ndjson; do
+            python -m vex_agent.ingest.parse_event_logs --input "$f" --insert
+          done
+
+      - name: Test
+        run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - name: Format check
+        run: npm run format:check
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build

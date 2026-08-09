@@ -7,8 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 const TURNSTILE_SITE_KEY = "0x4AAAAAAD9y1rcwgwx5PODV";
 
-const apiBase =
-  import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8000/v1";
+const apiBase = import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8000/v1";
 
 export default function TurnstileGate() {
   const [open, setOpen] = useState(false);

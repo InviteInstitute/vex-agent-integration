@@ -6,6 +6,7 @@ This is the XML -> AST step from Hyeongjo's Colab. The returned shape deliberate
 matches the Colab's `xml_to_block_ast`, so the downstream APTED conversion behaves
 identically to training.
 """
+
 import json
 import xml.etree.ElementTree as ET
 
@@ -78,18 +79,29 @@ def xml_to_block_ast(xml_string, keep_shadow=False):
         if is_root:
             roots.append(current_id)
         if parent_id is not None:
-            edges.append({
-                "source": parent_id, "target": current_id,
-                "edge_type": edge_type, "slot": slot, "order": order,
-            })
+            edges.append(
+                {
+                    "source": parent_id,
+                    "target": current_id,
+                    "edge_type": edge_type,
+                    "slot": slot,
+                    "order": order,
+                }
+            )
 
         for child in block_elem:
             if child.tag in ("next", "statement", "value"):
                 slot_name = child.attrib.get("name") if child.tag != "next" else None
                 nested = _find_child_blocks(child, allow_shadow=keep_shadow)
                 for i, nb in enumerate(nested):
-                    traverse(nb, parent_id=current_id, edge_type=child.tag,
-                             slot=slot_name, order=i, is_root=False)
+                    traverse(
+                        nb,
+                        parent_id=current_id,
+                        edge_type=child.tag,
+                        slot=slot_name,
+                        order=i,
+                        is_root=False,
+                    )
         return current_id
 
     for child in root:

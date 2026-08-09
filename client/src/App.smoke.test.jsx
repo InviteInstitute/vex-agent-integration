@@ -15,9 +15,7 @@ beforeEach(() => {
   );
   vi.stubGlobal(
     "fetch",
-    vi.fn(() =>
-      Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) }),
-    ),
+    vi.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })),
   );
 });
 

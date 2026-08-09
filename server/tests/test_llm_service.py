@@ -1,7 +1,8 @@
 """Covers llm_service without Ollama: credential loading, the OpenAI client call
 (mocked), length enforcement, and the sanitized generate path."""
-from vex_agent.llm import client as ls
+
 from vex_agent.domain.feedback_policy import FeedbackClass
+from vex_agent.llm import client as ls
 
 
 def test_load_navigator_credentials_from_env(monkeypatch):
@@ -12,7 +13,9 @@ def test_load_navigator_credentials_from_env(monkeypatch):
 
 def test_enforce_student_response_length():
     assert ls.enforce_student_response_length("") == ""
-    assert ls.enforce_student_response_length("One two three. Four five.").startswith("One two three")
+    assert ls.enforce_student_response_length("One two three. Four five.").startswith(
+        "One two three"
+    )
     long = " ".join(str(i) for i in range(40))
     assert len(ls.enforce_student_response_length(long).split()) <= 22
 
@@ -53,6 +56,7 @@ def test_create_openai_client_uses_credentials(monkeypatch):
 
 def test_credentials_missing_raises(monkeypatch):
     import pytest
+
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
     # no env creds and no navigator_api_keys.json -> clear error
@@ -62,12 +66,16 @@ def test_credentials_missing_raises(monkeypatch):
 
 def test_generate_main_llm_response_sanitizes_and_trims(monkeypatch):
     # a leaked, multi-sentence model output -> cleaned + trimmed to one sentence
-    monkeypatch.setattr(ls, "execute_prompt",
-                        lambda **k: 'Encouragement: "You are close. Keep going and try more."')
+    monkeypatch.setattr(
+        ls, "execute_prompt", lambda **k: 'Encouragement: "You are close. Keep going and try more."'
+    )
     out = ls.generate_main_llm_response(
-        task="t", student_message="m", available_blocks=["drive"],
+        task="t",
+        student_message="m",
+        available_blocks=["drive"],
         current_program="when started\ndrive for forward, amount 200",
-        situation="r", recent_messages=[],
+        situation="r",
+        recent_messages=[],
         feedback_classes={FeedbackClass.REASSURE},
     )
     text = out["response_text"]
