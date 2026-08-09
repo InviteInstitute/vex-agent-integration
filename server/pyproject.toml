@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==8.4.2"]
+dev = ["pytest==8.4.2", "ruff==0.16.2"]
 
 [project.scripts]
 vex-parse-logs = "vex_agent.ingest.parse_event_logs:main"
