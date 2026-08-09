@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 def test_health():
     from vex_agent.app import app
     with TestClient(app) as client:  # context manager runs lifespan (start/stop daemon)
-        resp = client.get("/health")
+        resp = client.get("/healthz")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
