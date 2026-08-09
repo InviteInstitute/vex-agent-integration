@@ -1,5 +1,12 @@
 :root {
-  font-family: "Trebuchet MS", "Avenir Next", sans-serif;
+  font-family:
+    "Source Sans Pro",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Helvetica,
+    Arial,
+    sans-serif;
   color: #213246;
   background: rgb(134, 190, 241);
   line-height: 1.5;
@@ -146,6 +153,14 @@ button {
 .start-card h2 {
   margin: 0 0 0.4rem;
   font-size: 1.15rem;
+  font-family:
+    "Montserrat",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Helvetica,
+    Arial,
+    sans-serif;
 }
 
 .start-card p {
@@ -225,6 +240,14 @@ button {
   font-size: 1.25rem;
   line-height: 1;
   color: #ffffff;
+  font-family:
+    "Montserrat",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Helvetica,
+    Arial,
+    sans-serif;
 }
 
 .toolbar p {
