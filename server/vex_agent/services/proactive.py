@@ -1,27 +1,31 @@
 """App-level glue between the agent's EventRecord stream and the pure vendored
 trigger engine (server/src/triggers/). The engine stays framework/DB-free; this
 module does the adapting so the coupling points one way (app -> engine)."""
+
 from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from vex_agent.config import DEFAULT_PLAYGROUND
-from vex_agent.domain.metrics import EventRecord
-from vex_agent.data.db import fetch_events_from_db
-from vex_agent.triggers.run_sequence import compute_run_edit_distances
-from vex_agent.triggers.detectors import detect_run_triggers_by_playground
-from vex_agent.triggers.constants import INACTIVE_TRIGGER_SECONDS, RE_ALERT_SECONDS, TRIGGER_LABELS
 from vex_agent.data.db import (
-    insert_agent_trigger_if_new, insert_message, mark_agent_trigger_acted,
-    latest_inactive_trigger, resolve_open_inactive_triggers,
+    fetch_events_from_db,
+    insert_agent_trigger_if_new,
+    insert_message,
+    latest_inactive_trigger,
+    mark_agent_trigger_acted,
+    resolve_open_inactive_triggers,
 )
 from vex_agent.domain.feedback_policy import FeedbackClass
-from vex_agent.services.sessions import append_session_message
+from vex_agent.domain.metrics import EventRecord
 from vex_agent.services.feedback import generate_feedback
 from vex_agent.services.identity import track_identity_switches
+from vex_agent.services.sessions import append_session_message
+from vex_agent.triggers.constants import INACTIVE_TRIGGER_SECONDS, RE_ALERT_SECONDS, TRIGGER_LABELS
+from vex_agent.triggers.detectors import detect_run_triggers_by_playground
+from vex_agent.triggers.run_sequence import compute_run_edit_distances
 
 log = logging.getLogger(__name__)
 
@@ -119,7 +123,9 @@ def compute_run_distances_for_session(student_id: str, session_id: str) -> list[
 
 
 def _compute_run_distances_cached(
-    student_id: str, session_id: str, events: list[EventRecord],
+    student_id: str,
+    session_id: str,
+    events: list[EventRecord],
 ) -> list[dict]:
     sig = _runs_signature(events)
     key = (student_id, session_id)
@@ -145,8 +151,12 @@ def is_inactive(last_event_ts: datetime | None, now: datetime) -> bool:
     return (now - last_event_ts).total_seconds() >= INACTIVE_TRIGGER_SECONDS
 
 
-def detect_inactive_trigger(student_id: str, session_id: str, now: datetime | None = None,
-                            events: list[EventRecord] | None = None):
+def detect_inactive_trigger(
+    student_id: str,
+    session_id: str,
+    now: datetime | None = None,
+    events: list[EventRecord] | None = None,
+):
     """The sustained inactive trigger with re-alert lifecycle (ported from lm-dashboard).
 
     Fires when the session is idle past INACTIVE_TRIGGER_SECONDS. The FIRST fire uses
@@ -162,7 +172,7 @@ def detect_inactive_trigger(student_id: str, session_id: str, now: datetime | No
         events = fetch_events_from_db(student_id=student_id, session_id=session_id)
     if not events:
         return None
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     last_ts = events[-1].event_ts  # events are ascending by event_ts
     if not is_inactive(last_ts, now):
         return None  # not idle -> no inactive fire (recovery is handled by the caller)
@@ -178,8 +188,11 @@ def detect_inactive_trigger(student_id: str, session_id: str, now: datetime | No
         run_index = last_run_index - 1  # next negative index for this re-alert
 
     idle_minutes = int((now - last_ts).total_seconds() // 60)
-    return ("inactive", run_index,
-            {"label": TRIGGER_LABELS["inactive"], "value": f"idle {idle_minutes}m"})
+    return (
+        "inactive",
+        run_index,
+        {"label": TRIGGER_LABELS["inactive"], "value": f"idle {idle_minutes}m"},
+    )
 
 
 def persist_new_triggers(student_id: str, session_id: str) -> list[dict]:
@@ -213,12 +226,14 @@ def persist_new_triggers(student_id: str, session_id: str) -> list[dict]:
             detail=detail,
         )
         if trigger_id is not None:
-            new_rows.append({
-                "id": trigger_id,
-                "trigger_type": trigger_type,
-                "run_index": run_index,
-                "detail": detail,
-            })
+            new_rows.append(
+                {
+                    "id": trigger_id,
+                    "trigger_type": trigger_type,
+                    "run_index": run_index,
+                    "detail": detail,
+                }
+            )
     return new_rows
 
 
@@ -256,8 +271,8 @@ def generate_proactive_response(
         session_id=session_id,
         playground=playground or DEFAULT_PLAYGROUND,
         feedback_classes=feedback_classes,
-        student_message="",           # no student turn on the proactive lane
-        behavior_fact=neutral_fact,    # neutral fact, never the internal trigger label
+        student_message="",  # no student turn on the proactive lane
+        behavior_fact=neutral_fact,  # neutral fact, never the internal trigger label
     )
     return result["llm_request"]
 
@@ -277,7 +292,11 @@ def run_proactive_tick(student_id: str, session_id: str, playground: str | None 
     acted = []
     for fire in new_triggers:
         result = generate_proactive_response(
-            student_id, session_id, fire["trigger_type"], fire["detail"], playground,
+            student_id,
+            session_id,
+            fire["trigger_type"],
+            fire["detail"],
+            playground,
         )
         if result is None:  # trigger not acted on in v1
             continue
@@ -296,15 +315,20 @@ def run_proactive_tick(student_id: str, session_id: str, playground: str | None 
             origin="proactive",
         )
         append_session_message(
-            student_id=student_id, playground=playground, session_id=session_id,
-            role="assistant", content=message_text,
+            student_id=student_id,
+            playground=playground,
+            session_id=session_id,
+            role="assistant",
+            content=message_text,
         )
         mark_agent_trigger_acted(trigger_id=fire["id"], response_id=response_id)
-        acted.append({
-            "trigger_id": fire["id"],
-            "trigger_type": fire["trigger_type"],
-            "run_index": fire["run_index"],
-            "response_id": str(response_id),
-            "message": message_text,
-        })
+        acted.append(
+            {
+                "trigger_id": fire["id"],
+                "trigger_type": fire["trigger_type"],
+                "run_index": fire["run_index"],
+                "response_id": str(response_id),
+                "message": message_text,
+            }
+        )
     return {"detected": new_triggers, "acted": acted}

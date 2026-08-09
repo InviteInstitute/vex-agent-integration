@@ -1,5 +1,6 @@
 """System + bot-gate routes, kept out of the app wiring module: health, ping,
 and the one open Turnstile-verify endpoint."""
+
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
@@ -34,12 +35,17 @@ class TurnstileVerifyRequest(BaseModel):
 
 @router.post("/v1/turnstile/verify/")
 async def turnstile_verify(body: TurnstileVerifyRequest, request: Request, response: Response):
-    remote_ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip() \
-        or (request.client.host if request.client else "")
+    remote_ip = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or (
+        request.client.host if request.client else ""
+    )
     if not await verify_turnstile(body.token, remote_ip):
         raise HTTPException(status_code=403, detail="turnstile verification failed")
     response.set_cookie(
-        COOKIE_NAME, sign_cookie(),
-        max_age=COOKIE_MAX_AGE, httponly=True, secure=True, samesite="lax",
+        COOKIE_NAME,
+        sign_cookie(),
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        secure=True,
+        samesite="lax",
     )
     return {"ok": True}

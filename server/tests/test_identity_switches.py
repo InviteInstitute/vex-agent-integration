@@ -2,15 +2,14 @@
 
 Seeds a casing flip in parsed_events, runs the tracker, and asserts one switch_events
 row is written and that re-running is idempotent. Skips without DATABASE_URL."""
+
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    not os.getenv("DATABASE_URL"), reason="needs a live DATABASE_URL"
-)
+pytestmark = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="needs a live DATABASE_URL")
 
 
 def _insert_event(session_id, student_id, event_ts):
@@ -34,10 +33,10 @@ def test_casing_switch_detected_recorded_and_idempotent():
     from vex_agent.services.identity import track_identity_switches
 
     session_id = str(uuid4())
-    lower = f"cobra_{uuid4().hex[:8]}"   # unique per run -> no cross-test collision
-    upper = lower.capitalize()           # same canon, different casing
+    lower = f"cobra_{uuid4().hex[:8]}"  # unique per run -> no cross-test collision
+    upper = lower.capitalize()  # same canon, different casing
     canon = canon_id(lower)
-    t1 = datetime.now(timezone.utc) - timedelta(minutes=5)
+    t1 = datetime.now(UTC) - timedelta(minutes=5)
     t2 = t1 + timedelta(minutes=1)
 
     try:
@@ -64,5 +63,7 @@ def test_casing_switch_detected_recorded_and_idempotent():
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM event_logs.switch_events WHERE student_id=%s", (canon,))
                 cur.execute("DELETE FROM event_logs.student_identity WHERE canon_id=%s", (canon,))
-                cur.execute("DELETE FROM event_logs.parsed_events WHERE session_id=%s", (session_id,))
+                cur.execute(
+                    "DELETE FROM event_logs.parsed_events WHERE session_id=%s", (session_id,)
+                )
             conn.commit()

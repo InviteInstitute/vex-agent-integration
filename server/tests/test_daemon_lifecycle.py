@@ -1,5 +1,6 @@
 """Covers the daemon thread lifecycle + config getters + run_daemon_tick error
 branches (the parts test_trigger_daemon.py's pure tests don't reach)."""
+
 import threading
 
 from vex_agent.services import daemon as td
@@ -22,8 +23,9 @@ def test_start_and_stop_daemon_runs_a_tick(monkeypatch):
     monkeypatch.setenv("TRIGGER_DAEMON_ENABLED", "true")
     monkeypatch.setenv("TRIGGER_POLL_INTERVAL_S", "0.02")
     ticked = threading.Event()
-    monkeypatch.setattr(td, "run_daemon_tick",
-                        lambda: (ticked.set(), {"scoped": 0, "acted": []})[1])
+    monkeypatch.setattr(
+        td, "run_daemon_tick", lambda: (ticked.set(), {"scoped": 0, "acted": []})[1]
+    )
     try:
         td.start_daemon()
         assert ticked.wait(2.0)  # the loop executed at least one tick
@@ -39,7 +41,9 @@ def test_run_daemon_tick_swallows_sync_failure(monkeypatch):
         raise RuntimeError("prod down")
 
     monkeypatch.setattr(td, "sync_invite_hub_logs", boom)
-    monkeypatch.setattr(td, "get_latest_session_id_for_student", lambda s: None)  # no session -> skip
+    monkeypatch.setattr(
+        td, "get_latest_session_id_for_student", lambda s: None
+    )  # no session -> skip
     out = td.run_daemon_tick()  # must not raise despite the sync failure
     assert out["scoped"] == 1 and out["acted"] == []
 

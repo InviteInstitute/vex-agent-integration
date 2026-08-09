@@ -8,6 +8,7 @@ from datetime import timedelta
 # source_log_id) drop the re-fetched duplicates.
 SYNC_OVERLAP_SECONDS = 2
 
+from vex_agent.data.db import get_ingest_cursor, save_ingest_cursor
 from vex_agent.ingest.fetch_invite_hub_logs import (
     DEFAULT_BASE_URL,
     DEFAULT_PAGE_SIZE,
@@ -16,11 +17,10 @@ from vex_agent.ingest.fetch_invite_hub_logs import (
     fetch_vex_logs_incremental,
     get_auth_token,
     load_local_env,
-    parse_source_log_id,
     parse_event_time,
+    parse_source_log_id,
 )
 from vex_agent.ingest.parse_event_logs import insert_rows, parse_records
-from vex_agent.data.db import get_ingest_cursor, save_ingest_cursor
 
 
 def sync_invite_hub_logs(*, student_id: str | None = None, advance_cursor: bool = True) -> int:
@@ -53,8 +53,12 @@ def sync_invite_hub_logs(*, student_id: str | None = None, advance_cursor: bool 
     query_string = build_query_string(student_id=student_id)
     try:
         raw_records = fetch_vex_logs_incremental(
-            base_url, token, query_string,
-            page_size=DEFAULT_PAGE_SIZE, last_source_log_id=last_source_log_id, date_from=date_from,
+            base_url,
+            token,
+            query_string,
+            page_size=DEFAULT_PAGE_SIZE,
+            last_source_log_id=last_source_log_id,
+            date_from=date_from,
         )
     except RuntimeError as exc:
         # The cached token (get_auth_token) is a static key reused across calls;
@@ -64,8 +68,12 @@ def sync_invite_hub_logs(*, student_id: str | None = None, advance_cursor: bool 
         clear_cached_token()
         token = get_auth_token(base_url)
         raw_records = fetch_vex_logs_incremental(
-            base_url, token, query_string,
-            page_size=DEFAULT_PAGE_SIZE, last_source_log_id=last_source_log_id, date_from=date_from,
+            base_url,
+            token,
+            query_string,
+            page_size=DEFAULT_PAGE_SIZE,
+            last_source_log_id=last_source_log_id,
+            date_from=date_from,
         )
     if not raw_records:
         return 0

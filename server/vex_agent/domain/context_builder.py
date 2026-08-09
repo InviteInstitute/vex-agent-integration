@@ -4,8 +4,8 @@ Context Builder
 
 import json
 from dataclasses import dataclass, field
-from typing import List
 
+from vex_agent.data.db import fetch_events_from_db
 from vex_agent.domain.feedback_policy import FeedbackClass
 from vex_agent.domain.metrics import (
     GO_MARS_MILESTONE_RULES,
@@ -13,24 +13,25 @@ from vex_agent.domain.metrics import (
     analyze_current_state,
     extract_playground_parameters,
 )
-from vex_agent.data.db import fetch_events_from_db
+
 
 @dataclass
 class FeedbackSpec:
     description: str
-    examples: List[str]
-    extra_notes: List[str] = field(default_factory=list)
+    examples: list[str]
+    extra_notes: list[str] = field(default_factory=list)
+
 
 FEEDBACK_SPECS = {
     "Positive Feedback": FeedbackSpec(
         description="Confirms that the action is fully correct. Clearly identifies what was done correctly and why it works. Focus on the task.",
         examples=[
             "You specified an appropriate distance for the robot to move forward, so it will not fall over the cliff.",
-            "You used the [x] block, which allowed the robot to pick up the trash."
+            "You used the [x] block, which allowed the robot to pick up the trash.",
         ],
         extra_notes=[
             "Keep the message concise and specific without excessive praise. Emphasize what makes the text correct and the student's apparent reasoning, rather than their abilities."
-        ]
+        ],
     ),
     "Partial Correctness": FeedbackSpec(
         description="Acknowledges what is correct, but also acknowledges what needs adjustment.",
@@ -39,133 +40,117 @@ FEEDBACK_SPECS = {
         ],
         extra_notes=[
             "Start with what works, then address what needs revision. Keep feedback manageable and focused on one or two issues, or keep the feedback more high level."
-        ]
+        ],
     ),
     "Corrective Guidance": FeedbackSpec(
         description="Indicates that the action is incorrect and provides clear guidance on how to fix it.",
         examples=[
             "The move forward command runs for too long, which is why your robot falls off the cliff. Replace the distance with something shorter.",
-            "Your if block is always going to be true, so your robot will never turn left."
+            "Your if block is always going to be true, so your robot will never turn left.",
         ],
-        extra_notes=[]
+        extra_notes=[],
     ),
     "Evidence-Based Praise": FeedbackSpec(
         description="Highlights a specific successful action and explains why it was effective. The goal is to encourage effort based on evidence.",
         examples=[
             "Your use of the conditional if statement allows your agent to move in the correct way without requiring a lot of code.",
-            "You cleaned up the trash with very few lines of code."
+            "You cleaned up the trash with very few lines of code.",
         ],
         extra_notes=[
             "Ensure that praise is tied to a specific accomplishment to avoid directing attention to the self.",
             "As long as the student is making progress, validate their work, which is not the same as praise.",
-            "Focus on strategies and decisions, not the person."
-        ]
+            "Focus on strategies and decisions, not the person.",
+        ],
     ),
     "Reassure": FeedbackSpec(
         description="Encourages persistence by reducing student frustration. Validates prior effort and lets them know they are on the right track.",
         examples=[
             "Loops can be tricky. It is very common to have loops run forever until you find the right solution.",
-            "You are definitely on the right track and taking the necessary steps. A lot of students struggle with this problem."
+            "You are definitely on the right track and taking the necessary steps. A lot of students struggle with this problem.",
         ],
-        extra_notes=[]
+        extra_notes=[],
     ),
     "Error Flagging": FeedbackSpec(
         description="Identifies a specific error clearly and objectively without immediately providing the full solution.",
         examples=[
             "The while statement is always true and will run forever.",
             "You did not connect the two blocks.",
-            "The blocks are in the wrong order."
+            "The blocks are in the wrong order.",
         ],
-        extra_notes=[
-            "Name the exact issue. Avoid framing it around the person."
-        ]
+        extra_notes=["Name the exact issue. Avoid framing it around the person."],
     ),
     "How To": FeedbackSpec(
         description="Provides step-by-step instructions to do a task or solve the problem.",
-        examples=[
-            "To solve the problem of [problem], take steps a, b, c, and n."
-        ],
+        examples=["To solve the problem of [problem], take steps a, b, c, and n."],
         extra_notes=[
             "Break the explanation into small steps. Do not overwhelm the student with technical terms."
-        ]
+        ],
     ),
     "Inform": FeedbackSpec(
         description="Provides relevant knowledge about VEX VR components or behavior.",
-        examples=[
-            "Changing the speed affects how fast you go and how fast you turn."
-        ],
-        extra_notes=[]
+        examples=["Changing the speed affects how fast you go and how fast you turn."],
+        extra_notes=[],
     ),
     "Hint": FeedbackSpec(
         description="Encourages the learner to examine a specific part of their code without giving an explicit solution.",
         examples=[
             "Check where the stop driving block is placed.",
-            "Look at the order of each of your commands."
+            "Look at the order of each of your commands.",
         ],
-        extra_notes=[
-            "Keep the solution subtle."
-        ]
+        extra_notes=["Keep the solution subtle."],
     ),
     "Encourage Testing (Diagnose)": FeedbackSpec(
         description="Guides the learner to test the behavior of the robot to discover the issue independently.",
         examples=[
             "Does the condition in the while block ever become false?",
-            "If you reduce the speed, does turning become more accurate?"
+            "If you reduce the speed, does turning become more accurate?",
         ],
         extra_notes=[
             "Encourage experimentation in the VR environment and develop debugging skills."
-        ]
+        ],
     ),
     "Question": FeedbackSpec(
         description="Provides a focused question to stimulate reasoning about the problem.",
         examples=[
             "How many degrees should the robot turn to face the next obstacle?",
-            "At what point does the condition in the block become false?"
+            "At what point does the condition in the block become false?",
         ],
-        extra_notes=[
-            "Questions should be purposeful."
-        ]
+        extra_notes=["Questions should be purposeful."],
     ),
     "Fill-in-the-Blank": FeedbackSpec(
         description="Makes the student recall a concept they are not thinking of or have forgotten.",
         examples=[
             "The _________ block stops all movement.",
-            "To implement a condition, use the ___________ block."
+            "To implement a condition, use the ___________ block.",
         ],
-        extra_notes=[
-            "Reinforce VEX and programming jargon in the student's memory."
-        ]
+        extra_notes=["Reinforce VEX and programming jargon in the student's memory."],
     ),
     "Elaborate": FeedbackSpec(
         description="Provides a deeper explanation of why something happens.",
         examples=[
             "The robot misses the item because the drive distance is longer than it should be before turning.",
-            "The robot continues turning because the turn block or loop is never false."
+            "The robot continues turning because the turn block or loop is never false.",
         ],
-        extra_notes=[
-            "Do this in small segments."
-        ]
+        extra_notes=["Do this in small segments."],
     ),
     "Remind": FeedbackSpec(
         description="Restates the robotic goal.",
         examples=[
             "The goal is for the robot to pick up all objects.",
-            "Right now, the robot keeps driving because the condition to stop is never met."
+            "Right now, the robot keeps driving because the condition to stop is never met.",
         ],
         extra_notes=[
             "This is useful when the learner is possibly misunderstanding the task or outcome."
-        ]
+        ],
     ),
     "Next Step": FeedbackSpec(
         description="Gives a single immediate robotics action to try next.",
         examples=[
             "You could try changing the turn value to 90 degrees and try again.",
-            "What if you lower the speed to 75% and test the path?"
+            "What if you lower the speed to 75% and test the path?",
         ],
-        extra_notes=[
-            "Use this as a last resort."
-        ]
-    )
+        extra_notes=["Use this as a last resort."],
+    ),
 }
 
 FEEDBACK_CLASS_TO_SPEC_KEY = {
@@ -269,6 +254,7 @@ OUTPUT RULES
 - Never exceed 22 words.
 """
 
+
 def build_feedback_prompt(
     task: str,
     student_message: str,
@@ -282,17 +268,20 @@ def build_feedback_prompt(
     feedback_types_text = "\n".join(f"- {t}" for t in feedback_types)
 
     descriptions_text = "\n\n".join(
-        f"{t}:\n{feedback_specs[t].description}"
-        for t in feedback_types
+        f"{t}:\n{feedback_specs[t].description}" for t in feedback_types
     )
 
     examples_text = "\n\n".join(
-        f"{t}:\n" + "\n".join(f"- {e}" for e in feedback_specs[t].examples)
-        for t in feedback_types
+        f"{t}:\n" + "\n".join(f"- {e}" for e in feedback_specs[t].examples) for t in feedback_types
     )
 
     extra_notes_text = "\n\n".join(
-        f"{t}:\n" + ("\n".join(f"- {n}" for n in feedback_specs[t].extra_notes) if feedback_specs[t].extra_notes else "None")
+        f"{t}:\n"
+        + (
+            "\n".join(f"- {n}" for n in feedback_specs[t].extra_notes)
+            if feedback_specs[t].extra_notes
+            else "None"
+        )
         for t in feedback_types
     )
 
@@ -326,8 +315,7 @@ def build_feedback_prompt_from_classes(
             feedback_types.append(feedback_type)
 
     recent_chat = "\n".join(
-        f"{message['role'].capitalize()}: {message['content']}"
-        for message in recent_messages
+        f"{message['role'].capitalize()}: {message['content']}" for message in recent_messages
     )
     if not recent_chat:
         recent_chat = "None"
@@ -367,9 +355,9 @@ def build_current_program(
     project snapshot exists.
 
     Pass `events` to skip a redundant DB fetch (the reactive route already has them)."""
-    from vex_agent.triggers.smart_delta import generate_llm_prompt_from_project
-    from vex_agent.triggers.humanize import humanize_text
     from vex_agent.triggers.ast_builder import extract_workspace_xml
+    from vex_agent.triggers.humanize import humanize_text
+    from vex_agent.triggers.smart_delta import generate_llm_prompt_from_project
 
     if events is None:
         events = fetch_events_from_db(student_id=student_id, session_id=session_id)
@@ -474,11 +462,13 @@ def build_situation_model(events: list[EventRecord] | None) -> str:
             break
     if parameters:
         done = [
-            label for name, label in _MILESTONE_LABEL.items()
+            label
+            for name, label in _MILESTONE_LABEL.items()
             if GO_MARS_MILESTONE_RULES[name](parameters)
         ]
         todo = [
-            label for name, label in _MILESTONE_LABEL.items()
+            label
+            for name, label in _MILESTONE_LABEL.items()
             if not GO_MARS_MILESTONE_RULES[name](parameters)
         ]
         if done:

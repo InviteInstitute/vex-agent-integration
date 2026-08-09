@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib import error, parse, request
@@ -225,7 +225,7 @@ def parse_event_time(record: dict[str, Any]) -> datetime | None:
         dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
         return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def read_sync_state(path: Path) -> dict[str, Any]:
@@ -244,7 +244,7 @@ def write_sync_state(
     payload = {
         "last_source_log_id": last_source_log_id,
         "last_event_time": last_event_time,  # ISO ts of the newest event; drives dateFrom
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
@@ -337,7 +337,11 @@ def fetch_vex_logs_incremental(
                 records.append(item)
                 seen_ids.add(source_log_id)
 
-            if is_ascending and last_source_log_id is not None and max(batch_ids) <= last_source_log_id:
+            if (
+                is_ascending
+                and last_source_log_id is not None
+                and max(batch_ids) <= last_source_log_id
+            ):
                 offset += page_size
                 if len(batch) < page_size:
                     return records
@@ -495,7 +499,10 @@ def main() -> None:
             page_size=args.page_size,
             last_source_log_id=last_source_log_id,
         )
-        print(f"[fetch_invite_hub_logs] Incremental fetch returned {len(raw_records)} records.", flush=True)
+        print(
+            f"[fetch_invite_hub_logs] Incremental fetch returned {len(raw_records)} records.",
+            flush=True,
+        )
         text = serialize_records_as_ndjson(list(reversed(raw_records)))
         write_text_output(output_path, text)
         fetched_count = len(raw_records)

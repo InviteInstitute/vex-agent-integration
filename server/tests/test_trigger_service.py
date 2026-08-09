@@ -2,34 +2,47 @@
 
 Run from server/:  PYTHONPATH=. ../.venv/bin/python -m pytest tests/test_trigger_service.py
 """
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 
 from vex_agent.domain.metrics import EventRecord
 from vex_agent.services.proactive import compute_run_distances
 
 XMLNS = 'xmlns="https://developers.google.com/blockly/xml"'
 WS_A = f'<xml {XMLNS}><block type="pg_events_when_started" id="s"></block></xml>'
-WS_B = (f'<xml {XMLNS}><block type="pg_events_when_started" id="s">'
-        f'<next><block type="pg_drivetrain_drive_for" id="d"></block></next></block></xml>')
+WS_B = (
+    f'<xml {XMLNS}><block type="pg_events_when_started" id="s">'
+    f'<next><block type="pg_drivetrain_drive_for" id="d"></block></next></block></xml>'
+)
 
 
 def _run(ws, i, playground="GO-Mars"):
     return EventRecord(
-        id=i, session_id="s", student_id="stu",
-        event_ts=datetime(2026, 7, 14, 12, 0, i, tzinfo=timezone.utc),
-        event_type="runProject", playground=playground,
+        id=i,
+        session_id="s",
+        student_id="stu",
+        event_ts=datetime(2026, 7, 14, 12, 0, i, tzinfo=UTC),
+        event_type="runProject",
+        playground=playground,
         project_json={"workspace": ws, "playground": playground},
-        block_event_data_json=None, playground_data_json=None, error_message=None,
+        block_event_data_json=None,
+        playground_data_json=None,
+        error_message=None,
     )
 
 
 def _noise(i):
     return EventRecord(
-        id=i, session_id="s", student_id="stu",
-        event_ts=datetime(2026, 7, 14, 12, 0, i, tzinfo=timezone.utc),
-        event_type="blockChanged", playground="GO-Mars",
-        project_json={"workspace": WS_A}, block_event_data_json=None,
-        playground_data_json=None, error_message=None,
+        id=i,
+        session_id="s",
+        student_id="stu",
+        event_ts=datetime(2026, 7, 14, 12, 0, i, tzinfo=UTC),
+        event_type="blockChanged",
+        playground="GO-Mars",
+        project_json={"workspace": WS_A},
+        block_event_data_json=None,
+        playground_data_json=None,
+        error_message=None,
     )
 
 
@@ -44,8 +57,8 @@ def test_identical_rerun_is_zero_changed_is_positive():
     # only the 3 runProject events count; blockChanged is ignored
     assert [r["index"] for r in runs] == [0, 1, 2]
     assert runs[0]["edit_distance"] is None
-    assert runs[1]["edit_distance"] == 0     # identical rerun
-    assert runs[2]["edit_distance"] > 0      # added a block
+    assert runs[1]["edit_distance"] == 0  # identical rerun
+    assert runs[2]["edit_distance"] > 0  # added a block
 
 
 def test_playground_switch_resets_distance_to_none():

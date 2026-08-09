@@ -1,15 +1,14 @@
 """Ingestion idempotency (migration 012): re-inserting a row with the same
 source_log_id must not create a duplicate parsed_events row. DB-gated and
 self-cleaning, matching the other db-helper tests."""
+
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    not os.getenv("DATABASE_URL"), reason="needs a live DATABASE_URL"
-)
+pytestmark = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="needs a live DATABASE_URL")
 
 
 def _row(student: str, source_log_id: int, session) -> dict:
@@ -17,7 +16,7 @@ def _row(student: str, source_log_id: int, session) -> dict:
         "session_id": session,
         "student_id": student,
         "class_code": None,
-        "event_ts": datetime(2026, 8, 9, tzinfo=timezone.utc),
+        "event_ts": datetime(2026, 8, 9, tzinfo=UTC),
         "event_type": "runProject",
         "program_type": None,
         "playground": None,
@@ -35,8 +34,8 @@ def _row(student: str, source_log_id: int, session) -> dict:
 
 
 def test_repeated_source_log_id_inserts_once():
-    from vex_agent.ingest.parse_event_logs import insert_rows
     from vex_agent.data.db import get_conn
+    from vex_agent.ingest.parse_event_logs import insert_rows
 
     student = f"test_{uuid4().hex[:8]}"
     session = uuid4()

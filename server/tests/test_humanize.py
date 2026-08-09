@@ -1,16 +1,16 @@
 """humanize: readable program listing with parameters. Vendored from the
 self-check in lm-dashboard/app/runs/humanize.py (no dedicated test file there)."""
-from vex_agent.triggers.humanize import humanize_workspace, humanize_text
 
+from vex_agent.triggers.humanize import humanize_text, humanize_workspace
 
 DEMO = (
-    '<xml>'
+    "<xml>"
     '<block type="pg_events_when_started"><next>'
     '  <block type="pg_drivetrain_drive_for">'
     '    <field name="DIRECTION">fwd</field><field name="UNITS">mm</field>'
     '    <field name="anddontwait_mutator">false</field>'
     '    <value name="AMOUNT"><shadow type="math_number"><field name="NUM">200</field></shadow></value>'
-    '  <next>'
+    "  <next>"
     '    <block type="pg_control_if_then_else">'
     '      <value name="CONDITION"><block type="pg_operator_not"><value name="OPERAND">'
     '        <block type="pg_operator_and_or"><field name="CHECK">and</field>'
@@ -18,11 +18,11 @@ DEMO = (
     '            <value name="NUM1"><block type="pg_sensing_distance_distance"><field name="DISTANCE">frontdistance</field></block></value>'
     '            <value name="NUM2"><shadow type="math_number"><field name="NUM">200</field></shadow></value></block></value>'
     '          <value name="OPERAND2"><block type="pg_sensing_optical_near_object"><field name="OPTICAL">fronteye</field></block></value>'
-    '        </block></value></block></value>'
+    "        </block></value></block></value>"
     '      <statement name="SUBSTACK"><block type="pg_drivetrain_drive"><field name="DIRECTION">fwd</field></block></statement>'
     '      <statement name="SUBSTACK2"><block type="pg_drivetrain_stop_driving"/></statement>'
-    '    </block></next></block>'
-    '</next></block></xml>'
+    "    </block></next></block>"
+    "</next></block></xml>"
 )
 
 

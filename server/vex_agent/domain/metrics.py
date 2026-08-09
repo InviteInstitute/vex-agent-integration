@@ -4,10 +4,11 @@ import argparse
 import json
 from collections import Counter
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from statistics import mean
 from typing import Any, Iterable
+
 
 class ActionLevel(str, Enum):
     LOW = "LOW"
@@ -63,7 +64,9 @@ GO_MARS_MILESTONE_RULES = {
     ),
     "tilt_solar_panel": lambda parameters: parameters.get("tilted_solarPanel") is True,
     "move_hero_bot_out_of_crater": lambda parameters: parameters.get("rover_rescued") is True,
-    "lift_rocket_ship_upright": lambda parameters: parameters.get("lifted_rocketShip_upright") is True,
+    "lift_rocket_ship_upright": lambda parameters: (
+        parameters.get("lifted_rocketShip_upright") is True
+    ),
     "remove_fuel_cells_from_cradles": lambda parameters: (
         isinstance(parameters.get("removed_fuel_cells_craters"), (int, float))
         and parameters.get("removed_fuel_cells_craters", 0) > 0
@@ -126,9 +129,9 @@ class CurrentStateSnapshot:
 
 def parse_dt(value: Any) -> datetime:
     if isinstance(value, datetime):
-        return value.astimezone(timezone.utc)
+        return value.astimezone(UTC)
     if isinstance(value, str):
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
     raise TypeError(f"Unsupported datetime value: {value!r}")
 
 
@@ -194,6 +197,7 @@ def segment_episodes_for_events(events: list[EventRecord]) -> tuple[list[dict], 
     """Segment an EventRecord list into CODE/RUN/RESET episodes + pauses, via the
     vendored episode_engine. Returns (episodes, pauses). Pure (no DB)."""
     from vex_agent.triggers.episode_engine import segment_session
+
     if not events:
         return [], []
     return segment_session(_events_to_segmenter_input(events))
@@ -229,13 +233,9 @@ def extract_playground_parameters(playground_data_json: dict[str, Any] | None) -
 
 
 def compute_go_mars_milestone_progress_pct(parameters: dict[str, Any]) -> float:
-    completed_milestones = sum(
-        1 for rule in GO_MARS_MILESTONE_RULES.values() if rule(parameters)
-    )
+    completed_milestones = sum(1 for rule in GO_MARS_MILESTONE_RULES.values() if rule(parameters))
     return round(
-        min(completed_milestones, GO_MARS_INITIAL_GOAL_SCORE)
-        / GO_MARS_INITIAL_GOAL_SCORE
-        * 100.0,
+        min(completed_milestones, GO_MARS_INITIAL_GOAL_SCORE) / GO_MARS_INITIAL_GOAL_SCORE * 100.0,
         2,
     )
 
@@ -280,12 +280,16 @@ def compute_action_level(total_events: int, time_on_task_s: float) -> ActionLeve
     return ActionLevel.HIGH
 
 
-def build_progress_series(events: list[EventRecord], playground: str) -> list[tuple[datetime, float]]:
+def build_progress_series(
+    events: list[EventRecord], playground: str
+) -> list[tuple[datetime, float]]:
     series: list[tuple[datetime, float]] = []
     for event in events:
         if event.playground_data_json is None:
             continue
-        series.append((event.event_ts, compute_progress_pct(event.playground_data_json, playground)))
+        series.append(
+            (event.event_ts, compute_progress_pct(event.playground_data_json, playground))
+        )
     return series
 
 
@@ -386,8 +390,10 @@ def classify_cognition(
         new_info = event.block_event_data_json.get("newInfo")
         if isinstance(new_info, dict) and "parent" in new_info:
             snap_count += 1
-        if isinstance(old_info, dict) and "parent" in old_info and not (
-            isinstance(new_info, dict) and "parent" in new_info
+        if (
+            isinstance(old_info, dict)
+            and "parent" in old_info
+            and not (isinstance(new_info, dict) and "parent" in new_info)
         ):
             unsnap_count += 1
 
@@ -459,12 +465,8 @@ def analyze_current_state(events: list[EventRecord]) -> CurrentStateSnapshot:
     # "ran, then sat watching the result" signal SNAP_N_TEST looks for; INACTIVE_PAUSE
     # is a long idle that direction/time-on-task should ideally not average across.
     _, segment_pauses = segment_episodes_for_events(segment)
-    post_run_pause_count = sum(
-        1 for p in segment_pauses if p["episode_type"] == "POST_RUN_PAUSE"
-    )
-    inactive_pause_count = sum(
-        1 for p in segment_pauses if p["episode_type"] == "INACTIVE_PAUSE"
-    )
+    post_run_pause_count = sum(1 for p in segment_pauses if p["episode_type"] == "POST_RUN_PAUSE")
+    inactive_pause_count = sum(1 for p in segment_pauses if p["episode_type"] == "INACTIVE_PAUSE")
     cognition = classify_cognition(
         segment,
         progress_series,
@@ -489,7 +491,7 @@ def analyze_current_state(events: list[EventRecord]) -> CurrentStateSnapshot:
         persistence=persistence,
         computed_from_event_id_min=min(event_ids) if event_ids else None,
         computed_from_event_id_max=max(event_ids) if event_ids else None,
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
         post_run_pause_count=post_run_pause_count,
         inactive_pause_count=inactive_pause_count,
     )
@@ -514,7 +516,9 @@ def compute_snapshot_for_student_session(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Compute a current-state snapshot for a student/session.")
+    parser = argparse.ArgumentParser(
+        description="Compute a current-state snapshot for a student/session."
+    )
     parser.add_argument("--student-id", required=True, help="Student ID to analyze")
     parser.add_argument("--session-id", required=True, help="Session ID to analyze")
     parser.add_argument(

@@ -1,6 +1,5 @@
 from collections import defaultdict
 
-
 MAX_SESSION_TURNS = 6
 
 _session_messages: dict[tuple[str, str, str], list[dict[str, str]]] = defaultdict(list)

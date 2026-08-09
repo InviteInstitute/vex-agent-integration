@@ -1,4 +1,5 @@
 """Covers the db helpers not exercised elsewhere (DB-gated, self-cleaning)."""
+
 import os
 from uuid import uuid4
 
@@ -8,7 +9,7 @@ pytestmark = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="needs a l
 
 
 def test_all_students():
-    from vex_agent.data.db import get_conn, all_students
+    from vex_agent.data.db import all_students, get_conn
 
     student = f"test_{uuid4().hex[:8]}"
     try:
@@ -24,12 +25,16 @@ def test_all_students():
     finally:
         with get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM event_logs.parsed_events WHERE student_id = %s", (student,))
+                cur.execute(
+                    "DELETE FROM event_logs.parsed_events WHERE student_id = %s", (student,)
+                )
 
 
 def test_message_roundtrip_response_lookup_and_feedback():
     from vex_agent.data.db import (
-        get_conn, insert_message, get_message_id_for_response,
+        get_conn,
+        get_message_id_for_response,
+        insert_message,
         insert_message_feedback,
     )
 
@@ -37,11 +42,19 @@ def test_message_roundtrip_response_lookup_and_feedback():
     session = uuid4()
     response_id = uuid4()
     try:
-        insert_message(session_id=session, student_id=student, role="assistant",
-                       message_text="hi", response_id=response_id, origin="proactive")
+        insert_message(
+            session_id=session,
+            student_id=student,
+            role="assistant",
+            message_text="hi",
+            response_id=response_id,
+            origin="proactive",
+        )
         message_id = get_message_id_for_response(response_id=response_id, student_id=student)
         assert message_id is not None
-        insert_message_feedback(message_id=message_id, student_id=student, thumb="up", comment="nice")
+        insert_message_feedback(
+            message_id=message_id, student_id=student, thumb="up", comment="nice"
+        )
     finally:
         with get_conn() as conn:
             with conn.cursor() as cur:

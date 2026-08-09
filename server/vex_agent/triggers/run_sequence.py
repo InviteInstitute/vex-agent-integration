@@ -17,9 +17,10 @@ Public API:
 NOTE: wiring this to the agent's EventRecord stream is a separate slice (issue #4).
 This module stays on the dashboard's dict shape so it's a faithful vendor.
 """
+
 import json
 
-from .ast_builder import xml_to_block_ast, extract_workspace_xml
+from .ast_builder import extract_workspace_xml, xml_to_block_ast
 from .distance import cached_edit_distance
 
 

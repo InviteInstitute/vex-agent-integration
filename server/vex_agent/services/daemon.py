@@ -20,14 +20,15 @@ is a background thread with no supervisor to restart it, so non-transient errors
 logged and continued rather than re-raised -- a dead thread would silently stop the
 push lane until app restart.
 """
+
 import logging
 import os
 import random
 import threading
 
-from vex_agent.services.proactive import run_proactive_tick
-from vex_agent.data.db import get_latest_session_id_for_student, all_students
+from vex_agent.data.db import all_students, get_latest_session_id_for_student
 from vex_agent.services.logsync import sync_invite_hub_logs
+from vex_agent.services.proactive import run_proactive_tick
 
 log = logging.getLogger("trigger_daemon")
 
@@ -110,11 +111,15 @@ def _loop() -> None:
     """The tick loop with idle + failure backoff (ported from lm-dashboard)."""
     base = poll_interval_s()
     ceiling = idle_max_s()
-    log.info("trigger daemon started (interval=%ss, idle_max=%ss, recency=%sh)",
-             base, ceiling, student_recency_hours())
+    log.info(
+        "trigger daemon started (interval=%ss, idle_max=%ss, recency=%sh)",
+        base,
+        ceiling,
+        student_recency_hours(),
+    )
 
-    fails = 0       # consecutive tick failures
-    idle = 0        # consecutive idle ticks (nothing to do)
+    fails = 0  # consecutive tick failures
+    idle = 0  # consecutive idle ticks (nothing to do)
     while not _stop.is_set():
         busy = False
         try:
@@ -122,14 +127,18 @@ def _loop() -> None:
             acted = result.get("acted", [])
             busy = bool(acted)
             if acted:
-                log.info("tick: acted on %d trigger(s) across %d student(s)",
-                         len(acted), result.get("scoped", 0))
+                log.info(
+                    "tick: acted on %d trigger(s) across %d student(s)",
+                    len(acted),
+                    result.get("scoped", 0),
+                )
             fails = 0  # success resets the failure counter
         except Exception as error:
             fails += 1
             delay = min(_MAX_BACKOFF_S, 0.5 * (2 ** min(fails, 6))) + random.uniform(0, 0.5)
-            log.warning("daemon tick failed (%d consecutive): %s -- backoff %.1fs",
-                        fails, error, delay)
+            log.warning(
+                "daemon tick failed (%d consecutive): %s -- backoff %.1fs", fails, error, delay
+            )
             if fails >= _UNHEALTHY_AFTER:
                 log.error("UNHEALTHY: %d consecutive daemon tick failures", fails)
             _stop.wait(delay)

@@ -1,14 +1,13 @@
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from psycopg.types.json import Json
 
 from vex_agent.data.db import get_conn
-
 
 _last_skip_summary: dict[str, int] = {}
 
@@ -24,7 +23,7 @@ def parse_iso_timestamp(value: Any) -> str | None:
         dt = datetime.fromisoformat(normalized)
     except ValueError:
         return value
-    return dt.astimezone(timezone.utc).isoformat()
+    return dt.astimezone(UTC).isoformat()
 
 
 def parse_json_string(value: Any) -> Any:
@@ -77,7 +76,9 @@ def build_parsed_event(raw_record: dict[str, Any], source: str) -> dict[str, Any
 
     session_id = require_non_null(record_id, "sessionID", payload.get("sessionID"))
     student_id = require_non_null(record_id, "studentID", payload.get("studentID"))
-    event_ts = require_non_null(record_id, "timestamp", parse_iso_timestamp(payload.get("timestamp")))
+    event_ts = require_non_null(
+        record_id, "timestamp", parse_iso_timestamp(payload.get("timestamp"))
+    )
     event_type = require_non_null(record_id, "eventType", payload.get("eventType"))
 
     return {
@@ -98,7 +99,7 @@ def build_parsed_event(raw_record: dict[str, Any], source: str) -> dict[str, Any
         "source_received_at": source_received_at,
         "source_queue": raw_record.get("queue_name") or raw_record.get("queue"),
         "source": source,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -232,7 +233,9 @@ def insert_rows(rows: list[dict[str, Any]]) -> int:
             "program_type": row["program_type"],
             "playground": row["playground"],
             "project_json": Json(row["project_json"]) if row["project_json"] is not None else None,
-            "block_event_data_json": Json(row["block_event_data_json"]) if row["block_event_data_json"] is not None else None,
+            "block_event_data_json": Json(row["block_event_data_json"])
+            if row["block_event_data_json"] is not None
+            else None,
             "playground_data_json": Json(row["playground_data_json"])
             if row["playground_data_json"] is not None
             else None,

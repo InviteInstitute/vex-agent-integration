@@ -8,9 +8,16 @@ only; the DB-coupled sustained `inactive` sweep lives in a later slice).
   explorer   : a single run with edit_distance >= EXPLORER_EDIT_DISTANCE.
   iterative  : ITERATIVE_DEFAULT_THRESHOLD runs with edit_distance > 0 (steady edits).
 """
+
 from vex_agent.triggers.constants import (
-    WHEEL_SPIN_ZERO_RUNS, RESILIENCE_ZERO_RUNS, EXPLORER_EDIT_DISTANCE,
-    ITERATIVE_EDIT_MIN, ITERATIVE_DEFAULT_THRESHOLD, ITERATIVE_THRESHOLDS,
+    EXPLORER_EDIT_DISTANCE,
+    ITERATIVE_DEFAULT_THRESHOLD,
+    ITERATIVE_EDIT_MIN,
+    ITERATIVE_THRESHOLDS,
+    RESILIENCE_ZERO_RUNS,
+    WHEEL_SPIN_ZERO_RUNS,
+)
+from vex_agent.triggers.constants import (
     TRIGGER_LABELS as LABELS,
 )
 
@@ -36,13 +43,26 @@ def detect_run_triggers(edit_distances, iterative_threshold=ITERATIVE_DEFAULT_TH
         if ed is None:
             continue
         if ed > 0 and zero_streak >= RESILIENCE_ZERO_RUNS:
-            out.append(("resilience", i, {"label": LABELS["resilience"],
-                                          "value": f"recovered after {zero_streak} reruns"}))
+            out.append(
+                (
+                    "resilience",
+                    i,
+                    {
+                        "label": LABELS["resilience"],
+                        "value": f"recovered after {zero_streak} reruns",
+                    },
+                )
+            )
         if ed == 0:
             zero_streak += 1
             if zero_streak >= WHEEL_SPIN_ZERO_RUNS and wheel_armed:
-                out.append(("wheel_spin", i, {"label": LABELS["wheel_spin"],
-                                              "value": f"{zero_streak} identical reruns"}))
+                out.append(
+                    (
+                        "wheel_spin",
+                        i,
+                        {"label": LABELS["wheel_spin"], "value": f"{zero_streak} identical reruns"},
+                    )
+                )
                 wheel_armed = False
         else:
             zero_streak = 0
@@ -52,8 +72,13 @@ def detect_run_triggers(edit_distances, iterative_threshold=ITERATIVE_DEFAULT_TH
         if ed > ITERATIVE_EDIT_MIN:
             iter_count += 1
             if iter_count >= iterative_threshold and iter_armed:
-                out.append(("iterative", i, {"label": LABELS["iterative"],
-                                             "value": f"{iter_count} steady edits"}))
+                out.append(
+                    (
+                        "iterative",
+                        i,
+                        {"label": LABELS["iterative"], "value": f"{iter_count} steady edits"},
+                    )
+                )
                 iter_armed = False
         if ed == 0:
             iter_count = 0

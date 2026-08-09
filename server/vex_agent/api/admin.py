@@ -1,6 +1,7 @@
 """Admin endpoints for the proactive push lane. /admin/tick runs ONE full trigger
 pass for a session by hand -- the Slice-1 way to validate intervention quality on
 real sessions before the always-on daemon (#11) exists."""
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
