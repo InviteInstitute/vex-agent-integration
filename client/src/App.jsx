@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-const defaultApiBase =
-  import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8000/v1";
+const defaultApiBase = import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8000/v1";
 
 const starterMessages = [
   {
     id: "assistant-intro",
     role: "assistant",
-    body:
-      "Hi! I am your coding helper. Ask a question about your project, or tap 'Help' for assistance.",
+    body: "Hi! I am your coding helper. Ask a question about your project, or tap 'Help' for assistance.",
     meta: "Ready to help",
     canFeedback: false,
   },
@@ -58,7 +56,11 @@ export function renderMessageBody(text) {
     }
 
     const Tag = listType === "ol" ? "ol" : "ul";
-    elements.push(<Tag key={key} className="message-list-block">{listItems}</Tag>);
+    elements.push(
+      <Tag key={key} className="message-list-block">
+        {listItems}
+      </Tag>,
+    );
     listItems = [];
     listType = null;
   };
@@ -78,9 +80,7 @@ export function renderMessageBody(text) {
         flushList(`list-${index}`);
       }
       listType = "ul";
-      listItems.push(
-        <li key={`li-${index}`}>{renderInlineMarkdown(unorderedMatch[1])}</li>,
-      );
+      listItems.push(<li key={`li-${index}`}>{renderInlineMarkdown(unorderedMatch[1])}</li>);
       return;
     }
 
@@ -89,9 +89,7 @@ export function renderMessageBody(text) {
         flushList(`list-${index}`);
       }
       listType = "ol";
-      listItems.push(
-        <li key={`li-${index}`}>{renderInlineMarkdown(orderedMatch[1])}</li>,
-      );
+      listItems.push(<li key={`li-${index}`}>{renderInlineMarkdown(orderedMatch[1])}</li>);
       return;
     }
 
@@ -224,9 +222,7 @@ function App() {
     if (!studentId) {
       return undefined;
     }
-    const source = new EventSource(
-      `${apiBase}/students/${encodeURIComponent(studentId)}/stream`,
-    );
+    const source = new EventSource(`${apiBase}/students/${encodeURIComponent(studentId)}/stream`);
     source.addEventListener("assistant_message", (event) => {
       let payload;
       try {
@@ -289,11 +285,7 @@ function App() {
             12,
             window.innerWidth - current.width - 12,
           );
-          const nextY = clamp(
-            event.clientY - interaction.offsetY,
-            12,
-            window.innerHeight - 120,
-          );
+          const nextY = clamp(event.clientY - interaction.offsetY, 12, window.innerHeight - 120);
           return {
             ...current,
             x: nextX,
@@ -414,9 +406,7 @@ function App() {
     if (interactionRef.current) {
       return;
     }
-    setHoveredResizeHandle(
-      getResizeHandle(event.clientX, event.clientY, panelRect),
-    );
+    setHoveredResizeHandle(getResizeHandle(event.clientX, event.clientY, panelRect));
   };
 
   const handlePanelPointerLeave = () => {
@@ -499,9 +489,7 @@ function App() {
 
   const updateMessage = (messageId, updater) => {
     setMessages((current) =>
-      current.map((message) =>
-        message.id === messageId ? updater(message) : message,
-      ),
+      current.map((message) => (message.id === messageId ? updater(message) : message)),
     );
   };
 
@@ -646,27 +634,25 @@ function App() {
         student_message: trimmedDraft,
       });
       setSessionId(responseRecord.session_id);
-      setMessages((current) =>
-        [
-          ...current.map((message) =>
-            message.id === optimisticMessage.id
+      setMessages((current) => [
+        ...current.map((message) =>
+          message.id === optimisticMessage.id
+            ? {
+                ...message,
+                meta: "Sent",
+              }
+            : message.id === pendingAssistantMessage.id
               ? {
-                  ...message,
-                  meta: "Sent",
+                  id: responseRecord.response_id,
+                  role: "assistant",
+                  body: responseRecord.response_text,
+                  meta: responseRecord.llm_model || "Generated response",
+                  canFeedback: true,
+                  isLoading: false,
                 }
-              : message.id === pendingAssistantMessage.id
-                ? {
-                    id: responseRecord.response_id,
-                    role: "assistant",
-                    body: responseRecord.response_text,
-                    meta: responseRecord.llm_model || "Generated response",
-                    canFeedback: true,
-                    isLoading: false,
-                  }
-                : message,
-          ),
-        ],
-      );
+              : message,
+        ),
+      ]);
     } catch (error) {
       setMessages((current) =>
         current.map((message) =>
@@ -682,7 +668,7 @@ function App() {
                   meta: `Failed: ${error.message}`,
                   isLoading: false,
                 }
-            : message,
+              : message,
         ),
       );
     } finally {
@@ -716,27 +702,25 @@ function App() {
         student_message: "Help",
       });
       setSessionId(responseRecord.session_id);
-      setMessages((current) =>
-        [
-          ...current.map((message) =>
-            message.id === helpMessage.id
+      setMessages((current) => [
+        ...current.map((message) =>
+          message.id === helpMessage.id
+            ? {
+                ...message,
+                meta: "Sent",
+              }
+            : message.id === pendingAssistantMessage.id
               ? {
-                  ...message,
-                  meta: "Sent",
+                  id: responseRecord.response_id,
+                  role: "assistant",
+                  body: responseRecord.response_text,
+                  meta: responseRecord.llm_model || "Generated response",
+                  canFeedback: true,
+                  isLoading: false,
                 }
-              : message.id === pendingAssistantMessage.id
-                ? {
-                    id: responseRecord.response_id,
-                    role: "assistant",
-                    body: responseRecord.response_text,
-                    meta: responseRecord.llm_model || "Generated response",
-                    canFeedback: true,
-                    isLoading: false,
-                  }
-                : message,
-          ),
-        ],
-      );
+              : message,
+        ),
+      ]);
     } catch (error) {
       setMessages((current) =>
         current.map((message) =>
@@ -828,208 +812,209 @@ function App() {
             </button>
           ) : null}
 
-        <div className="workspace workspace-overlay">
-          {!studentId ? (
-            <div className="start-drag-surface" onPointerDown={startDrag}>
-              <section
-                className="start-card start-card-inline"
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <h2>Start Chat</h2>
-                <p>Enter your student ID. Session ID is optional if you want to target a specific test session.</p>
-                <form className="start-form" onSubmit={handleStudentStart}>
-                  <label className="sr-only" htmlFor="student-id">
-                    Student ID
-                  </label>
-                  <input
-                    id="student-id"
-                    type="text"
-                    value={studentIdDraft}
-                    onChange={(event) => setStudentIdDraft(event.target.value)}
-                    placeholder="Student ID"
-                    autoComplete="off"
-                    disabled={pendingAction === "session"}
-                  />
-                  <label className="sr-only" htmlFor="session-id">
-                    Session ID
-                  </label>
-                  <input
-                    id="session-id"
-                    type="text"
-                    value={sessionIdDraft}
-                    onChange={(event) => setSessionIdDraft(event.target.value)}
-                    placeholder="Session ID (optional)"
-                    autoComplete="off"
-                    disabled={pendingAction === "session"}
-                  />
-                  <button type="submit" disabled={pendingAction === "session"}>
-                    {pendingAction === "session" ? "Loading..." : "Start Chat"}
-                  </button>
-                </form>
-                {startError ? <p className="start-error">{startError}</p> : null}
-              </section>
-            </div>
-          ) : (
-            <section className="message-list" aria-label="Conversation" ref={messageListRef}>
-              {messages.map((message) => (
-                <article
-                  key={message.id}
-                  className={`message-row ${message.role === "student" ? "outgoing" : "incoming"}`}
+          <div className="workspace workspace-overlay">
+            {!studentId ? (
+              <div className="start-drag-surface" onPointerDown={startDrag}>
+                <section
+                  className="start-card start-card-inline"
+                  onPointerDown={(event) => event.stopPropagation()}
                 >
-                  <MessageAvatar role={message.role} />
-                  <div className="message-card">
-                    <div className="message-bubble">
-                      <div className="message-label">
-                        {message.role === "student" ? "You" : "Guide Bot"}
-                      </div>
-                      <div className="message-body-wrap">
-                        {message.isLoading ? (
-                          <div className="thinking-indicator" aria-label="Agent is thinking">
-                            <span className="thinking-text">Guide Bot is thinking</span>
-                            <span className="thinking-dots" aria-hidden="true">
-                              <span />
-                              <span />
-                              <span />
-                            </span>
-                          </div>
-                        ) : (
-                          renderMessageBody(message.body)
-                        )}
-                      </div>
-                      <span className="message-meta">{message.meta}</span>
-                      {message.trigger ? (
-                        <span
-                          className="trigger-badge"
-                          title="The behavior that triggered this proactive message"
-                          style={{
-                            display: "inline-block",
-                            marginTop: "4px",
-                            padding: "2px 8px",
-                            borderRadius: "999px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            background: "rgba(124, 58, 237, 0.12)",
-                            color: "#7c3aed",
-                          }}
-                        >
-                          ⚡ {message.trigger}
-                          {message.triggerWhy ? ` · ${message.triggerWhy}` : ""}
-                        </span>
-                      ) : null}
-                      {message.role === "assistant" && message.canFeedback ? (
-                        <div className="feedback-panel">
-                          <div className="feedback-actions">
-                            <button
-                              type="button"
-                              className={`icon-button ${message.selectedThumb === "up" ? "selected" : ""}`}
-                              onClick={() => handleFeedback(message.id, "up")}
-                              disabled={Boolean(pendingFeedback[message.id])}
-                              aria-label="Thumbs up"
-                              title="Thumbs up"
-                            >
-                              {pendingFeedback[message.id] === "up" ? (
-                                "..."
-                              ) : (
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                  <path d="M10 21H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h4v11Zm2-11 2.6-6.1A1.5 1.5 0 0 1 16 3a2 2 0 0 1 2 2v4h2.7a2 2 0 0 1 2 2.4l-1.2 6A2 2 0 0 1 19.5 19H12V10Z" />
-                                </svg>
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              className={`icon-button ${message.selectedThumb === "down" ? "selected" : ""}`}
-                              onClick={() => handleFeedback(message.id, "down")}
-                              disabled={Boolean(pendingFeedback[message.id])}
-                              aria-label="Thumbs down"
-                              title="Thumbs down"
-                            >
-                              {pendingFeedback[message.id] === "down" ? (
-                                "..."
-                              ) : (
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                  <path d="M14 3h4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-4V3Zm-2 11-2.6 6.1A1.5 1.5 0 0 1 8 21a2 2 0 0 1-2-2v-4H3.3a2 2 0 0 1-2-2.4l1.2-6A2 2 0 0 1 4.5 5H12v9Z" />
-                                </svg>
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              className="review-toggle"
-                              onClick={() =>
-                                setOpenReviews((current) => ({
-                                  ...current,
-                                  [message.id]: !current[message.id],
-                                }))
-                              }
-                            >
-                              {openReviews[message.id] ? "Hide Review" : "Add Review"}
-                            </button>
-                          </div>
-                          {openReviews[message.id] ? (
-                            <div className="review-form">
-                              <textarea
-                                rows="2"
-                                value={reviewDrafts[message.id] || ""}
-                                onChange={(event) =>
-                                  setReviewDrafts((current) => ({
-                                    ...current,
-                                    [message.id]: event.target.value,
-                                  }))
-                                }
-                                placeholder="Write a review if you want."
-                              />
+                  <h2>Start Chat</h2>
+                  <p>
+                    Enter your student ID. Session ID is optional if you want to target a specific
+                    test session.
+                  </p>
+                  <form className="start-form" onSubmit={handleStudentStart}>
+                    <label className="sr-only" htmlFor="student-id">
+                      Student ID
+                    </label>
+                    <input
+                      id="student-id"
+                      type="text"
+                      value={studentIdDraft}
+                      onChange={(event) => setStudentIdDraft(event.target.value)}
+                      placeholder="Student ID"
+                      autoComplete="off"
+                      disabled={pendingAction === "session"}
+                    />
+                    <label className="sr-only" htmlFor="session-id">
+                      Session ID
+                    </label>
+                    <input
+                      id="session-id"
+                      type="text"
+                      value={sessionIdDraft}
+                      onChange={(event) => setSessionIdDraft(event.target.value)}
+                      placeholder="Session ID (optional)"
+                      autoComplete="off"
+                      disabled={pendingAction === "session"}
+                    />
+                    <button type="submit" disabled={pendingAction === "session"}>
+                      {pendingAction === "session" ? "Loading..." : "Start Chat"}
+                    </button>
+                  </form>
+                  {startError ? <p className="start-error">{startError}</p> : null}
+                </section>
+              </div>
+            ) : (
+              <section className="message-list" aria-label="Conversation" ref={messageListRef}>
+                {messages.map((message) => (
+                  <article
+                    key={message.id}
+                    className={`message-row ${message.role === "student" ? "outgoing" : "incoming"}`}
+                  >
+                    <MessageAvatar role={message.role} />
+                    <div className="message-card">
+                      <div className="message-bubble">
+                        <div className="message-label">
+                          {message.role === "student" ? "You" : "Guide Bot"}
+                        </div>
+                        <div className="message-body-wrap">
+                          {message.isLoading ? (
+                            <div className="thinking-indicator" aria-label="Agent is thinking">
+                              <span className="thinking-text">Guide Bot is thinking</span>
+                              <span className="thinking-dots" aria-hidden="true">
+                                <span />
+                                <span />
+                                <span />
+                              </span>
+                            </div>
+                          ) : (
+                            renderMessageBody(message.body)
+                          )}
+                        </div>
+                        <span className="message-meta">{message.meta}</span>
+                        {message.trigger ? (
+                          <span
+                            className="trigger-badge"
+                            title="The behavior that triggered this proactive message"
+                            style={{
+                              display: "inline-block",
+                              marginTop: "4px",
+                              padding: "2px 8px",
+                              borderRadius: "999px",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              background: "rgba(124, 58, 237, 0.12)",
+                              color: "#7c3aed",
+                            }}
+                          >
+                            ⚡ {message.trigger}
+                            {message.triggerWhy ? ` · ${message.triggerWhy}` : ""}
+                          </span>
+                        ) : null}
+                        {message.role === "assistant" && message.canFeedback ? (
+                          <div className="feedback-panel">
+                            <div className="feedback-actions">
                               <button
                                 type="button"
-                                className="send-review"
-                                onClick={() => handleReviewSubmit(message.id)}
+                                className={`icon-button ${message.selectedThumb === "up" ? "selected" : ""}`}
+                                onClick={() => handleFeedback(message.id, "up")}
                                 disabled={Boolean(pendingFeedback[message.id])}
+                                aria-label="Thumbs up"
+                                title="Thumbs up"
                               >
-                                {pendingFeedback[message.id] === "review" ? "Sending..." : "Send Review"}
+                                {pendingFeedback[message.id] === "up" ? (
+                                  "..."
+                                ) : (
+                                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M10 21H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h4v11Zm2-11 2.6-6.1A1.5 1.5 0 0 1 16 3a2 2 0 0 1 2 2v4h2.7a2 2 0 0 1 2 2.4l-1.2 6A2 2 0 0 1 19.5 19H12V10Z" />
+                                  </svg>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className={`icon-button ${message.selectedThumb === "down" ? "selected" : ""}`}
+                                onClick={() => handleFeedback(message.id, "down")}
+                                disabled={Boolean(pendingFeedback[message.id])}
+                                aria-label="Thumbs down"
+                                title="Thumbs down"
+                              >
+                                {pendingFeedback[message.id] === "down" ? (
+                                  "..."
+                                ) : (
+                                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M14 3h4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-4V3Zm-2 11-2.6 6.1A1.5 1.5 0 0 1 8 21a2 2 0 0 1-2-2v-4H3.3a2 2 0 0 1-2-2.4l1.2-6A2 2 0 0 1 4.5 5H12v9Z" />
+                                  </svg>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className="review-toggle"
+                                onClick={() =>
+                                  setOpenReviews((current) => ({
+                                    ...current,
+                                    [message.id]: !current[message.id],
+                                  }))
+                                }
+                              >
+                                {openReviews[message.id] ? "Hide Review" : "Add Review"}
                               </button>
                             </div>
-                          ) : null}
-                          {message.feedbackStatus ? (
-                            <div className="feedback-status">{message.feedbackStatus}</div>
-                          ) : null}
-                        </div>
-                      ) : null}
+                            {openReviews[message.id] ? (
+                              <div className="review-form">
+                                <textarea
+                                  rows="2"
+                                  value={reviewDrafts[message.id] || ""}
+                                  onChange={(event) =>
+                                    setReviewDrafts((current) => ({
+                                      ...current,
+                                      [message.id]: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="Write a review if you want."
+                                />
+                                <button
+                                  type="button"
+                                  className="send-review"
+                                  onClick={() => handleReviewSubmit(message.id)}
+                                  disabled={Boolean(pendingFeedback[message.id])}
+                                >
+                                  {pendingFeedback[message.id] === "review"
+                                    ? "Sending..."
+                                    : "Send Review"}
+                                </button>
+                              </div>
+                            ) : null}
+                            {message.feedbackStatus ? (
+                              <div className="feedback-status">{message.feedbackStatus}</div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </article>
-              ))}
-              <div ref={messagesEndRef} aria-hidden="true" />
-            </section>
-          )}
-        </div>
+                  </article>
+                ))}
+                <div ref={messagesEndRef} aria-hidden="true" />
+              </section>
+            )}
+          </div>
 
-        {studentId ? (
-          <form className="composer" onSubmit={handleSend}>
-            <label className="sr-only" htmlFor="student-message">
-              Message
-            </label>
-            <textarea
-              id="student-message"
-              rows="3"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={handleComposerKeyDown}
-              placeholder="Ask about your program, your bug, or what to try next."
-            />
-            <div className="composer-footer">
-              <button type="submit" disabled={pendingAction === "message" || !draft.trim()}>
-                {pendingAction === "message" ? "Sending..." : "Send"}
-              </button>
-            </div>
-          </form>
-        ) : null}
+          {studentId ? (
+            <form className="composer" onSubmit={handleSend}>
+              <label className="sr-only" htmlFor="student-message">
+                Message
+              </label>
+              <textarea
+                id="student-message"
+                rows="3"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder="Ask about your program, your bug, or what to try next."
+              />
+              <div className="composer-footer">
+                <button type="submit" disabled={pendingAction === "message" || !draft.trim()}>
+                  {pendingAction === "message" ? "Sending..." : "Send"}
+                </button>
+              </div>
+            </form>
+          ) : null}
         </section>
       ) : null}
 
       {!isChatOpen ? (
-        <button
-          type="button"
-          className="chat-launcher"
-          onClick={() => setIsChatOpen(true)}
-        >
+        <button type="button" className="chat-launcher" onClick={() => setIsChatOpen(true)}>
           Open Chat
         </button>
       ) : null}
