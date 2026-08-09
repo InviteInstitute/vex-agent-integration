@@ -219,6 +219,7 @@ def insert_rows(rows: list[dict[str, Any]]) -> int:
         %(source_queue)s,
         %(source)s
     )
+    ON CONFLICT (source_log_id) DO NOTHING
     """
 
     payloads = [
