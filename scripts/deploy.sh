@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Deploy the latest to this prod server via docker compose: pull, rebuild the
-# images, and roll the stack (db + api), then verify /healthz. The schema is
-# created by the API on startup, so there is no separate migration step. Refuses
-# to run over uncommitted changes to tracked files -- commit, stash, or discard
-# them first so a pull never silently clobbers edits.
+# images, roll the stack (db + api), apply the SQL migrations, then verify
+# /healthz. Unlike lm-dashboard, the api does NOT create the schema on startup --
+# server/db/migrations/ is the source of truth and is applied here (every file is
+# idempotent via IF NOT EXISTS, so re-running the whole loop is safe). Refuses to
+# run over uncommitted changes to tracked files -- commit, stash, or discard them
+# first so a pull never silently clobbers edits.
 #
 # The proactive trigger daemon runs in-process inside the api (gated by
 # TRIGGER_DAEMON_ENABLED), so there is no separate daemon service to roll.
@@ -36,6 +38,13 @@ fi
 
 echo "Building + rolling the stack ..."
 docker compose -f compose.yml up -d --build
+
+echo "Applying migrations (idempotent) ..."
+for f in server/db/migrations/*.sql; do
+  echo "  $f"
+  docker compose -f compose.yml exec -T db \
+    psql -U vexagent -d vexagent -v ON_ERROR_STOP=1 -q < "$f" >/dev/null
+done
 
 echo "Waiting for the API to come back up ..."
 for _ in $(seq 1 30); do
