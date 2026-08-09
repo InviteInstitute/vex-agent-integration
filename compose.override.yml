@@ -1,0 +1,29 @@
+# Dev-only extras, auto-merged by `docker compose up` (prod runs
+# `docker compose -f compose.yml up` to skip this). It layers in:
+#   - uvicorn --reload watching live source, via a bind mount
+#   - a Vite dev server on :5173 with hot-reload for the client
+# so both backend and frontend changes reload without a rebuild.
+#
+# In prod the client is a static build served by nginx (see the deploy notes),
+# so there is no client service in compose.yml -- only here for local dev.
+services:
+  api:
+    command: uvicorn vex_agent.app:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./server/vex_agent:/app/vex_agent
+
+  client:
+    image: node:20-slim
+    working_dir: /client
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      # The browser (on the host) reaches the api via its published loopback port,
+      # not the compose-internal `api` hostname. Matches the api's default CORS allow-list.
+      VITE_API_BASE_URL: http://127.0.0.1:8001/v1
+    volumes:
+      - ./client:/client
+      - /client/node_modules      # keep the container's node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api

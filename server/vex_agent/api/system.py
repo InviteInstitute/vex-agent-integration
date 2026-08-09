@@ -13,7 +13,7 @@ from vex_agent.api.turnstile import (
 router = APIRouter(tags=["system"])
 
 
-@router.get("/health")
+@router.get("/healthz")
 def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
 
