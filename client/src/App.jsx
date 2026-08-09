@@ -14,7 +14,7 @@ const starterMessages = [
   },
 ];
 
-function renderInlineMarkdown(text) {
+export function renderInlineMarkdown(text) {
   const parts = [];
   const pattern = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`)/g;
   let lastIndex = 0;
@@ -42,7 +42,7 @@ function renderInlineMarkdown(text) {
   return parts;
 }
 
-function renderMessageBody(text) {
+export function renderMessageBody(text) {
   if (typeof text !== "string") {
     return text;
   }
@@ -145,7 +145,7 @@ function MessageAvatar({ role }) {
   );
 }
 
-function clamp(value, min, max) {
+export function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
