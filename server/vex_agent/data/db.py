@@ -34,6 +34,52 @@ def get_conn() -> psycopg.Connection:
     return psycopg.connect(database_url)
 
 
+def get_ingest_cursor(name: str = "invite_hub") -> dict:
+    """The Invite Hub ingestion cursor (event_logs.ingest_cursor), or {} if unseeded.
+    Returns {last_source_log_id: int|None, last_event_time: datetime|None}. This is
+    the single source of truth for how far log ingestion has progressed -- it
+    replaced the old bind-mounted JSON file (migration 013)."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT last_source_log_id, last_event_time "
+                "FROM event_logs.ingest_cursor WHERE name = %s",
+                (name,),
+            )
+            row = cur.fetchone()
+    if row is None:
+        return {}
+    return {"last_source_log_id": row[0], "last_event_time": row[1]}
+
+
+def save_ingest_cursor(
+    last_source_log_id: int,
+    last_event_time: datetime | None = None,
+    *,
+    name: str = "invite_hub",
+) -> None:
+    """Advance the ingestion cursor, forward-only: the WHERE guard never lets a stale
+    or out-of-order writer move it backward. Safe for concurrent full-catalog syncs
+    (the daemon and the boot warm-up) because inserts are idempotent (ON CONFLICT on
+    source_log_id) and this upsert only ever moves the pointer ahead."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO event_logs.ingest_cursor
+                    (name, last_source_log_id, last_event_time, updated_at)
+                VALUES (%s, %s, %s, NOW())
+                ON CONFLICT (name) DO UPDATE SET
+                    last_source_log_id = EXCLUDED.last_source_log_id,
+                    last_event_time = EXCLUDED.last_event_time,
+                    updated_at = NOW()
+                WHERE event_logs.ingest_cursor.last_source_log_id IS NULL
+                   OR EXCLUDED.last_source_log_id >= event_logs.ingest_cursor.last_source_log_id
+                """,
+                (name, last_source_log_id, last_event_time),
+            )
+
+
 def insert_agent_trigger_if_new(
     *,
     student_id: str,
