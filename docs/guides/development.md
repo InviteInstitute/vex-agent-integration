@@ -28,7 +28,7 @@ and `scripts/`, so each target does exactly what running those by hand would.
 
 | Target | What it does |
 |---|---|
-| `make dev` | start the local stack (API with reload, Vite on `:5173`); Ctrl-C to stop |
+| `make dev` | start the local stack (API with reload, Vite on `:5173`), Ctrl-C to stop |
 | `make down` | stop the local stack |
 | `make logs` / `make ps` | follow logs / show stack status |
 | `make test` | backend (pytest) and client (vitest) tests |
@@ -46,7 +46,7 @@ and `scripts/`, so each target does exactly what running those by hand would.
 
 **Ruff** is the single source of truth for Python linting and formatting. Its config
 lives in `server/pyproject.toml` and is kept identical to lm-dashboard. The rule set is
-pyflakes, import sorting, pyupgrade, and bugbear; line length is left to the formatter,
+pyflakes, import sorting, pyupgrade, and bugbear. Line length is left to the formatter,
 which the codebase favors dense over wrapped.
 
 **Prettier** formats the client (JSX and CSS), configured in `client/.prettierrc.json`,
@@ -90,9 +90,9 @@ so a React or Vite incompatibility fails loudly.
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request, in two
 jobs that mirror the make targets:
 
-- **backend** — installs the package, runs `ruff check` and `ruff format --check`, then
+- **backend** - installs the package, runs `ruff check` and `ruff format --check`, then
   builds the schema from the migrations against a throwaway Postgres, seeds the fixtures,
   and runs pytest.
-- **frontend** — runs the prettier check, the vitest suite, and a production build.
+- **frontend** - runs the prettier check, the vitest suite, and a production build.
 
 A green run means lint, formatting, both test suites, and the client build are all intact.

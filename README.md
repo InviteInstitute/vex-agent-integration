@@ -3,7 +3,7 @@
 A pedagogical AI agent for **VEXcode VR**, the block-based tool middle schoolers use to
 drive a virtual robot. It watches how a student's code changes as they work, builds a
 grounded picture of what they are actually doing, and gives short, kind, specific
-feedback — both when a student asks and, on its own, when a student looks stuck.
+feedback - both when a student asks and, on its own, when a student looks stuck.
 
 ```mermaid
 flowchart LR
@@ -19,7 +19,7 @@ flowchart LR
 
 ## Quick Start
 
-All you need is **Docker** with the Compose v2 plugin, and an LLM the agent can call —
+All you need is **Docker** with the Compose v2 plugin, and an LLM the agent can call -
 in development that can be a local [Ollama](https://ollama.com), so no cloud credentials
 are needed to see it work.
 
@@ -28,7 +28,7 @@ cp .env.example .env       # set POSTGRES_PASSWORD and point OPENAI_* at an LLM
 make dev                   # (or: docker compose up --build) API on :8001, Postgres on :5433
 ```
 
-`make` (or `make help`) lists the shared command vocabulary — `dev`, `test`, `lint`,
+`make` (or `make help`) lists the shared command vocabulary - `dev`, `test`, `lint`,
 `format`, `build`, `deploy`. See the [Development](https://inviteinstitute.github.io/vex-agent-integration/guides/development/) docs.
 
 Then apply the schema and load a bundled fixture so there's real telemetry to ground on:
@@ -47,14 +47,14 @@ The full walkthrough (dev vs prod, the LLM setup, running one feedback tick) is 
 The agent talks to a student in two ways, and **both run the same feedback code**, so the
 pedagogy is identical on either path:
 
-- **Reactive** — a student types a question or taps Help. The agent grounds the reply in
+- **Reactive** - a student types a question or taps Help. The agent grounds the reply in
   their current program and answers.
-- **Proactive** — a background daemon watches the event stream, measures how each run
+- **Proactive** - a background daemon watches the event stream, measures how each run
   differs from the last, and detects behaviors (wheel-spinning, resilience, exploring,
   step-by-step, going idle). When one fires it pushes a short note without being asked.
 
-Under both is one deterministic **situation model** — a plain-language read of the session
-built from telemetry, not guessed by the model — plus a single LLM pass. The trigger
+Under both is one deterministic **situation model** - a plain-language read of the session
+built from telemetry, not guessed by the model - plus a single LLM pass. The trigger
 engine is vendored from [lm-dashboard](https://github.com/InviteInstitute/lm-dashboard) so
 the agent's read of a student stays comparable to the researcher dashboard's.
 
@@ -63,7 +63,7 @@ the agent's read of a student stays comparable to the researcher dashboard's.
 | Path | What |
 |---|---|
 | `server/vex_agent/` | the FastAPI backend, in layers (`api`, `services`, `domain`, `data`, `ingest`, `triggers`) |
-| `server/db/migrations/` | the schema, as ordered idempotent SQL — the source of truth |
+| `server/db/migrations/` | the schema, as ordered idempotent SQL - the source of truth |
 | `client/` | the React (Vite) chat client |
 | `docs/` | the Material for MkDocs site |
 
@@ -82,6 +82,6 @@ docs.
 
 Ingestion pulls VEX logs from the Hub incrementally (a cursor in Postgres, idempotent
 inserts) and parses them into `parsed_events`. The proactive daemon assumes a **single
-writer** and is the sole owner of that cursor. The full write-up — architecture, the
-feedback pipeline, proactive triggers, the data model, configuration, and the API — lives
+writer** and is the sole owner of that cursor. The full write-up - architecture, the
+feedback pipeline, proactive triggers, the data model, configuration, and the API - lives
 at <https://inviteinstitute.github.io/vex-agent-integration/>.

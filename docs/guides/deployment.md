@@ -5,7 +5,7 @@ description: Rolling the stack with docker compose and scripts/deploy.sh, applyi
 # Deployment
 
 Production runs the same `compose.yml` as local dev, minus the dev-only overlay. The
-stack is two services — **`db`** (Postgres) and **`api`** (FastAPI, with the proactive
+stack is two services - **`db`** (Postgres) and **`api`** (FastAPI, with the proactive
 daemon running in-process). The React client is a static build served by **nginx**, not
 by the API.
 
@@ -34,20 +34,20 @@ the hood the script does, in order:
 1. Aborts if there are uncommitted changes to tracked files, so a pull never clobbers edits.
 2. `git pull --ff-only`.
 3. `docker compose -f compose.yml up -d --build` (rolls `db` + `api`).
-4. Applies every `server/db/migrations/*.sql` (all idempotent — see below).
+4. Applies every `server/db/migrations/*.sql` (all idempotent - see below).
 5. Polls `http://127.0.0.1:8001/healthz` and exits non-zero if it isn't `200`.
 
 !!! note "The daemon rolls with the API"
     The proactive daemon runs inside the `api` container (gated by
     `TRIGGER_DAEMON_ENABLED`), so there's no separate service to deploy. Run exactly one
-    `api` instance — the daemon assumes a single writer.
+    `api` instance - the daemon assumes a single writer.
 
 ## Migrations
 
-The SQL files under `server/db/migrations/` are the source of truth for the schema — the
+The SQL files under `server/db/migrations/` are the source of truth for the schema - the
 API does **not** build it on startup. Every file is idempotent (`CREATE ... IF NOT
 EXISTS`, guarded constraints), so re-running the whole loop is safe. `deploy.sh` runs it
-for you; to apply by hand against a running DB:
+for you. To apply by hand against a running DB:
 
 ```bash
 for f in server/db/migrations/*.sql; do
@@ -59,7 +59,7 @@ done
 ## The Client Build
 
 The client is a Vite build that nginx serves from `client/dist`. `deploy.sh` does not
-rebuild it — do that when the frontend changes:
+rebuild it - do that when the frontend changes:
 
 ```bash
 npm --prefix client run build   # -> client/dist
@@ -87,7 +87,7 @@ server {
 
 !!! warning "Health path"
     The health check is `/healthz`. If you point an external uptime monitor at it, use
-    that exact path — an unknown path under `/` falls through to the SPA and returns the
+    that exact path - an unknown path under `/` falls through to the SPA and returns the
     HTML index with a `200`.
 
 ## Health Check

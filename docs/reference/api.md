@@ -11,8 +11,8 @@ live under `/v1`, the operational tick under `/admin`, and the health check at t
 **The bot gate.** Every `/v1/*` route is behind **Cloudflare Turnstile**
 (`TurnstileGateMiddleware`): a browser must present the signed "solved the widget" cookie,
 minted by `POST /v1/turnstile/verify/` (the one open `/v1` route). There's no student
-login — see [Configuration](../guides/configuration.md#the-bot-gate-turnstile). `/healthz`
-is unauthenticated; `/admin/*` sits outside the gate and is meant for internal use.
+login - see [Configuration](../guides/configuration.md#the-bot-gate-turnstile). `/healthz`
+is unauthenticated. `/admin/*` sits outside the gate and is meant for internal use.
 
 ## Endpoints At A Glance
 
@@ -20,7 +20,7 @@ is unauthenticated; `/admin/*` sits outside the gate and is meant for internal u
 |--------|------|---------|
 | `GET`  | `/healthz` | health check (unauthenticated) |
 | `POST` | `/v1/turnstile/verify/` | solve Turnstile, mint the gate cookie (the one open `/v1` route) |
-| `GET`  | `/v1/ping` | trip the gate at page load (gated; `403` until solved) |
+| `GET`  | `/v1/ping` | trip the gate at page load (gated, `403` until solved) |
 | `GET`  | `/v1/students/{id}/session` | resolve a student's latest session, syncing logs if needed |
 | `POST` | `/v1/students/{id}/messages` | record an inbound student message |
 | `POST` | `/v1/students/{id}/responses` | generate one grounded feedback reply |
@@ -43,7 +43,7 @@ the static client can own `/`.
 
 ## POST /v1/turnstile/verify/
 
-The one open `/v1` route. The browser posts the Turnstile token; on success the server
+The one open `/v1` route. The browser posts the Turnstile token. On success the server
 sets the signed, httpOnly gate cookie the middleware then checks on every other `/v1`
 call.
 
@@ -88,7 +88,7 @@ no telemetry.
 ## POST /v1/students/{student_id}/messages
 
 Record an inbound student message (a typed question, or a help-button tap). This persists
-the message; the grounded reply comes from the `responses` endpoint.
+the message. The grounded reply comes from the `responses` endpoint.
 
 ```json title="Request"
 { "session_id": null, "message": "why won't my robot turn?", "playground": null }
@@ -114,8 +114,8 @@ the message; the grounded reply comes from the `responses` endpoint.
 
 The core reactive endpoint: generate **one grounded feedback reply**. It refreshes the
 student's newest events (cursor-neutral), builds the deterministic situation model, and
-hands that plus the current program and recent chat to a single LLM pass. Both lanes —
-this one and the proactive daemon — run the [same pipeline](../concepts/feedback-pipeline.md).
+hands that plus the current program and recent chat to a single LLM pass. Both lanes -
+this one and the proactive daemon - run the [same pipeline](../concepts/feedback-pipeline.md).
 
 ```json title="Request"
 {
@@ -133,7 +133,7 @@ this one and the proactive daemon — run the [same pipeline](../concepts/feedba
   "student_id": "…",
   "playground": "GO-Mars",
   "message_id": "…",
-  "response_text": "Look at your turn block — the amount is 0, so it spins in place…",
+  "response_text": "Look at your turn block - the amount is 0, so it spins in place…",
   "llm_model": "gpt-oss-20b",
   "llm_prompt": "…",
   "status": "received"
@@ -168,7 +168,7 @@ client shows them without polling. The stream sends periodic keep-alives.
 
 ```text title="Response stream (text/event-stream)"
 event: assistant_message
-data: {"message_id": 42, "message_text": "Nice recovery — that edit changed things.", "trigger_type": "resilience", …}
+data: {"message_id": 42, "message_text": "Nice recovery - that edit changed things.", "trigger_type": "resilience", …}
 
 : keep-alive
 ```
@@ -180,10 +180,10 @@ newest message id), not the whole history.
 
 ## POST /admin/tick
 
-Run **one proactive tick** for a single student/session by hand — the same pass the
+Run **one proactive tick** for a single student/session by hand - the same pass the
 daemon runs on a loop. It detects any triggers, generates a proactive message for each
 new one, and returns what it found. Used for the [Quickstart](../quickstart.md) and for
-debugging; it sits outside the bot gate.
+debugging. It sits outside the bot gate.
 
 ```json title="Request"
 { "student_id": "…", "session_id": "…" }
