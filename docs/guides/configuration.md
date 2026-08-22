@@ -1,5 +1,5 @@
 ---
-description: Every environment variable the agent reads, plus NaviGator and Ollama LLM setups and the Turnstile bot gate.
+description: Every environment variable the agent reads, plus UIUC Servers and Ollama LLM setups and the Turnstile bot gate.
 ---
 
 # Configuration
@@ -19,8 +19,8 @@ cp .env.example .env
 | `POSTGRES_PASSWORD` | `.env` (compose) | (none) | password for the `db` service, compose refuses to start without it |
 | `DATABASE_URL` | app | (none) | Postgres connection string. Under compose the API reaches `db` on the compose network. For a venv run point it at the published port `5433` |
 | `OPENAI_API_KEY` | app | (none) | key for the LLM gateway. For a local Ollama any non-empty value works (e.g. `ollama`) |
-| `OPENAI_BASE_URL` | app | (none) | base URL of the OpenAI-compatible endpoint. NaviGator in prod, or `http://localhost:11434/v1` for Ollama |
-| `NAVIGATOR_MODEL` | app | (none) | the model name to call, e.g. `gpt-oss-20b` (NaviGator) or `llama3.2:latest` (Ollama) |
+| `OPENAI_BASE_URL` | app | (none) | base URL of the OpenAI-compatible endpoint. UIUC Servers in prod, or `http://localhost:11434/v1` for Ollama |
+| `NAVIGATOR_MODEL` | app | (none) | the model name to call, e.g. `gpt-oss-20b` (UIUC Servers) or `llama3.2:latest` (Ollama) |
 | `BACKEND_CORS_ORIGINS` | app | `localhost:5173`, `127.0.0.1:5173` | comma-separated allowed client origins (dev only, prod is proxied same-origin by nginx) |
 | `INVITE_HUB_BASE_URL` | app | `https://inviteinstitutehub.org` | the Invite Institute Hub, source of the VEX event logs |
 | `INVITE_HUB_USERNAME` / `INVITE_HUB_PASSWORD` | app | (none) | Hub credentials for log ingestion, leave empty to run on fixtures only |
@@ -37,10 +37,10 @@ cp .env.example .env
 Feedback runs through any OpenAI-compatible endpoint, set with the three `OPENAI_*` /
 `NAVIGATOR_MODEL` variables. Nothing about the pedagogy changes when you swap them.
 
-=== "NaviGator (production)"
+=== "UIUC Servers (production)"
 
     ```bash
-    OPENAI_API_KEY=your-navigator-key
+    OPENAI_API_KEY=your-uiuc-key
     OPENAI_BASE_URL=https://api.ai.it.ufl.edu/
     NAVIGATOR_MODEL=gpt-oss-20b
     ```

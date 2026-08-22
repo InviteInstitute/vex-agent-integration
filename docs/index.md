@@ -56,7 +56,7 @@ student stays comparable to the researcher dashboard's.
 ## What You Get
 
 The backend is one FastAPI service laid out in clean layers, a Postgres store, and a
-small React client. Feedback runs through the NaviGator LLM gateway in production or a
+small React client. Feedback runs through UIUC servers in production or a
 local Ollama in development, and nothing about the pedagogy changes when you swap them.
 
 ## Where To Go Next

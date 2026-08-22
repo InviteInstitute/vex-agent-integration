@@ -130,7 +130,7 @@ anything under `docs/`.
 
     ---
 
-    Every environment variable, plus NaviGator and Ollama setups.
+    Every environment variable, plus UIUC Servers and Ollama setups.
 
 -   :material-wrench:{ .lg .middle } **[Development](guides/development.md)**
 
