@@ -89,9 +89,22 @@ def clear_client_cache() -> None:
     _client = None
 
 
+def _thinking_enabled() -> bool:
+    """Thinking models (e.g. qwen3) emit a `<think>...</think>` reasoning block
+    before the answer. The navigator produces short student-facing feedback, so
+    thinking is off by default -- it would otherwise burn the token budget on
+    hidden reasoning and leave the visible reply blank. Opt in via
+    LLM_ENABLE_THINKING=true if a future use case wants it."""
+    return os.getenv("LLM_ENABLE_THINKING", "false").lower() in ("1", "true", "yes", "on")
+
+
 def execute_prompt(*, model: str, prompt: str, max_tokens: int | None = None) -> str:
     client = get_openai_client()
     kwargs = {"max_tokens": max_tokens} if max_tokens is not None else {}
+    # Only pass the thinking flag when disabling it; opt-in leaves the request
+    # untouched so a non-Qwen server never sees an unknown field.
+    if not _thinking_enabled():
+        kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
     response = client.chat.completions.create(
         model=model,
         messages=[

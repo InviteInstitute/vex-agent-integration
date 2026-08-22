@@ -47,3 +47,26 @@ def test_empty_and_none_safe():
 def test_idempotent():
     once = sanitize_llm_output('"Encouragement: keep going."')
     assert sanitize_llm_output(once) == once == "Keep going."
+
+
+def test_strips_complete_thinking_block():
+    # Qwen3 with thinking on emits a complete block then the answer; the
+    # answer must survive intact, including its capitalization.
+    out = sanitize_llm_output(
+        "<think>Let me reason about this.\n"
+        "The student forgot the loop.\n</think>\n"
+        "Your loop needs a condition block."
+    )
+    assert out == "Your loop needs a condition block."
+
+
+def test_strips_unterminated_thinking_block():
+    # max_tokens cut the model mid-reasoning -- the whole reply is an open
+    # think block with no answer. This is the blank-output failure mode.
+    assert sanitize_llm_output("<think>Let me reason carefully\nabout the student's") == ""
+
+
+def test_thinking_tags_mid_sentence_not_stripped():
+    # anchored at the start only: a genuine sentence mentioning a tag survives
+    out = sanitize_llm_output("Add a think block to your code.")
+    assert out == "Add a think block to your code."
