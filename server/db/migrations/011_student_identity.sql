@@ -16,9 +16,17 @@ CREATE TABLE IF NOT EXISTS event_logs.student_identity (
 );
 
 -- Idempotency belt-and-suspenders: a tie on last_event_ts across spellings can't
--- double-write the same switch.
-ALTER TABLE event_logs.switch_events
-    ADD CONSTRAINT switch_events_unique
-    UNIQUE (student_id, session_id, switch_kind, from_value, to_value);
+-- double-write the same switch. Guarded like 012 so re-running is a no-op
+-- (ALTER TABLE ADD CONSTRAINT has no IF NOT EXISTS).
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'switch_events_unique'
+    ) THEN
+        ALTER TABLE event_logs.switch_events
+            ADD CONSTRAINT switch_events_unique
+            UNIQUE (student_id, session_id, switch_kind, from_value, to_value);
+    END IF;
+END $$;
 
 COMMIT;
