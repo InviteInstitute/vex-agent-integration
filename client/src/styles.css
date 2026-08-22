@@ -463,7 +463,7 @@ button {
   background: rgba(8, 117, 226, 0.14);
   border: 1px solid rgba(8, 117, 226, 0.2);
   color: #12365c;
-  font-family: "SFMono-Regular", "Consolas", monospace;
+  font-family: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
   font-size: 0.9em;
   font-weight: 700;
 }
