@@ -29,6 +29,18 @@ TURNSTILE_SECRET = os.environ.get("TURNSTILE_SECRET")
 _signer = TimestampSigner(SESSION_SECRET)
 
 
+def gate_enabled() -> bool:
+    """Whether the bot gate is active. On by default (prod behavior); set
+    TURNSTILE_ENABLED=false to bypass it for local dev and tests, where there is no
+    Cloudflare widget to solve. Read per-request so a runtime env is always honored."""
+    return os.environ.get("TURNSTILE_ENABLED", "true").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
 async def verify_turnstile(token, remote_ip):
     """True iff Cloudflare accepts this widget response token."""
     async with httpx.AsyncClient(timeout=5.0) as client:
@@ -66,6 +78,8 @@ class TurnstileGateMiddleware(BaseHTTPMiddleware):
     /admin/* ops tooling) stays open."""
 
     async def dispatch(self, request, call_next):
+        if not gate_enabled():
+            return await call_next(request)
         path = request.url.path
         if not path.startswith(GATED_PREFIX) or path == VERIFY_PATH:
             return await call_next(request)

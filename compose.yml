@@ -1,35 +1,29 @@
 name: vex-agent-integration
 
+# Single all-in-one dev container: Postgres + API + client. This branch exists so a
+# teammate can `docker compose up` and get a fully seeded, working stack with nothing
+# to wire. Production does NOT run this -- it keeps the services split behind nginx
+# (see README "Serving It Remotely"). Application code is unchanged; only packaging.
 services:
-  db:
-    image: postgres:latest
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: vexagent
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: vexagent
-    volumes:
-      - pgdata:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vexagent -d vexagent"]
-      interval: 5s
-      timeout: 3s
-      retries: 15
-    ports:
-      - "127.0.0.1:5433:5432"
-
-  api:
-    build: ./server
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
     ports:
-      - "127.0.0.1:8001:8000"
-    # The Invite Hub sync cursor now lives in Postgres (event_logs.ingest_cursor,
-    # migration 013), not a bind-mounted JSON file, so there is nothing to mount
-    # here anymore -- a rebuild/recreate can no longer reset it.
+      - "127.0.0.1:5173:5173"   # the UI (open this)
+      - "127.0.0.1:8001:8000"   # the API (the browser + client call this)
+      - "127.0.0.1:5433:5432"   # Postgres, for optional inspection from the host
+    extra_hosts:
+      # Lets the container reach Ollama running natively on the host Mac at
+      # host.docker.internal:11434 (see OPENAI_BASE_URL in .env).
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - pgdata:/var/lib/postgresql/data          # DB survives restarts
+      - ./server/vex_agent:/app/server/vex_agent  # backend hot-reload (uvicorn --reload)
+      - ./client/src:/app/client/src              # frontend hot-reload (Vite HMR)
+      - ./client/index.html:/app/client/index.html
 
 volumes:
   pgdata:

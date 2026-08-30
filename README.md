@@ -17,30 +17,63 @@ flowchart LR
 > Full documentation is published at <https://inviteinstitute.github.io/vex-agent-integration/>
 > (or run `mkdocs serve` to read it locally on port 4100).
 
-## Quick Start
+## Quick Start (single-container dev)
 
-All you need is **Docker** with the Compose v2 plugin, and an LLM the agent can call -
-in development that can be a local [Ollama](https://ollama.com), so no cloud credentials
-are needed to see it work.
-
-```bash
-cp .env.example .env       # set POSTGRES_PASSWORD and point OPENAI_* at an LLM
-make dev                   # (or: docker compose up --build) API on :8001, Postgres on :5433
-```
-
-`make` (or `make help`) lists the shared command vocabulary - `dev`, `test`, `lint`,
-`format`, `build`, `deploy`. See the [Development](https://inviteinstitute.github.io/vex-agent-integration/guides/development/) docs.
-
-Then apply the schema and load a bundled fixture so there's real telemetry to ground on:
+This branch bundles everything - Postgres, the API, and the client - into **one
+container**, so setup is a single command with nothing to wire. All you need is
+**Docker** (Compose v2) and [Ollama](https://ollama.com) on your Mac for the LLM.
 
 ```bash
-export DATABASE_URL=postgresql://vexagent:$POSTGRES_PASSWORD@127.0.0.1:5433/vexagent
-for f in server/db/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
-vex-parse-logs --input server/tests/fixtures/raw_logs/01_error_flagging_a.ndjson --insert
+# one time: the model the agent calls, served locally by Ollama
+brew install ollama && ollama pull gpt-oss-20b   # the Ollama.app runs `ollama serve` for you
+
+cp .env.example .env     # ready to run as-is; nothing to edit
+docker compose up        # first run builds the image, then seeds the database
 ```
 
-The full walkthrough (dev vs prod, the LLM setup, running one feedback tick) is in the
-[Quickstart](https://inviteinstitute.github.io/vex-agent-integration/quickstart/) docs.
+Open the UI at <http://localhost:5173> (use `localhost`, which the Vite dev server
+allows). The API is on <http://127.0.0.1:8001>, and Postgres is exposed on
+`127.0.0.1:5433` if you want to inspect it directly.
+
+On first boot the container initializes Postgres, applies every migration, and loads
+the bundled VEX fixtures automatically, so there is real telemetry to ground on with
+**no manual steps**. The data lives in the `pgdata` volume and survives restarts; run
+`docker compose down -v` to wipe and reseed from scratch.
+
+This all-in-one container is a local-dev convenience and is intentionally **not** how
+production runs - prod keeps Postgres, the API, and an nginx-served static client
+separate (see [Serving It Remotely](#serving-it-remotely)). Your day-to-day changes
+live in `client/` and `server/vex_agent/`, which are the same files in both, so they
+port straight back to `main`.
+
+### Verifying it works
+
+After `docker compose up`, the logs show `[entrypoint] Database ready.` and then all
+three processes starting. To confirm the stack end to end:
+
+```bash
+curl http://127.0.0.1:8001/healthz          # the API is up
+```
+
+1. Open <http://localhost:5173> - the chat UI loads and its first `/v1` call succeeds
+   with no Turnstile screen.
+2. Edit a file under `client/src/` and the browser hot-reloads. Edit one under
+   `server/vex_agent/` and uvicorn reloads.
+3. Send a chat message and you get a grounded reply built from the seeded telemetry.
+   That is the real round trip out to Ollama running on your Mac.
+
+Rebuild the image after changing the `Dockerfile` or dependencies with
+`docker compose up --build`.
+
+### Caveats
+
+Both are Docker-on-Mac quirks rather than anything about the setup itself:
+
+- **The agent cannot reach Ollama.** Ollama defaults to listening on `127.0.0.1`, which
+  the container cannot always reach through `host.docker.internal`. On the host, run
+  `launchctl setenv OLLAMA_HOST 0.0.0.0` and restart Ollama.
+- **Hot reload feels sluggish.** File watching over Docker-Mac bind mounts is sometimes
+  slow to notice a change. A `docker compose restart` clears it.
 
 ## What You Get
 

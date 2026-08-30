@@ -1,0 +1,19 @@
+# Keep the build context small and hermetic: deps are (re)installed in the image,
+# so never copy host-built artifacts in (they may be the wrong OS/arch anyway).
+**/node_modules
+**/.venv
+venv/
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/*.egg-info
+client/dist
+client/.vite
+server/state
+.git
+**/.DS_Store
+# Env files are provided at runtime via compose `env_file`, not baked into the image.
+.env
+.env.*
+!.env.example
