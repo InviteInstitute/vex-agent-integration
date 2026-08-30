@@ -25,6 +25,21 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
+def hub_sync_on_boot() -> bool:
+    """Whether to drain the Invite Hub into Postgres during startup warm-up. On by
+    default so production keeps its incremental cursor warm. Set
+    INVITE_HUB_SYNC_ON_BOOT=false for local dev: against a fresh database the boot
+    drain pulls the entire Hub history on the startup path, which starves the API and
+    resets connections. With it off the app comes up immediately and Hub logs are
+    pulled deliberately (vex-fetch-logs), off the request path."""
+    return os.getenv("INVITE_HUB_SYNC_ON_BOOT", "true").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
 def warm_up() -> None:
     """Prime the process-global singletons that would otherwise be built inside the
     FIRST student request -- the LLM HTTP client and the Invite Hub auth token (~1s
@@ -34,6 +49,12 @@ def warm_up() -> None:
         get_openai_client()
     except Exception:
         logger.warning("LLM client warm-up skipped", exc_info=True)
+    if not hub_sync_on_boot():
+        logger.info(
+            "Invite Hub boot sync disabled (INVITE_HUB_SYNC_ON_BOOT=false); "
+            "pull logs on demand with vex-fetch-logs"
+        )
+        return
     try:
         sync_invite_hub_logs()  # primes + caches the Invite Hub auth token
     except Exception:

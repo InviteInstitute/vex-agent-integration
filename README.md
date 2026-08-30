@@ -65,6 +65,27 @@ curl http://127.0.0.1:8001/healthz          # the API is up
 Rebuild the image after changing the `Dockerfile` or dependencies with
 `docker compose up --build`.
 
+### Working against real Hub logs (optional)
+
+By default the app runs on the bundled fixtures and never touches the Invite Hub, so
+it comes up instantly. If you want to work against real telemetry, add your Hub
+credentials to `.env` (`INVITE_HUB_BASE_URL`, `INVITE_HUB_USERNAME`,
+`INVITE_HUB_PASSWORD`) and pull the logs on demand:
+
+```bash
+docker compose exec app vex-fetch-logs --incremental --insert
+```
+
+That runs as its own process, so it never blocks the API the way a startup drain
+would. The first pull can be large since it grabs history, so give Docker enough
+memory or bound it to a slice with `--date-from 2026-08-01`. Re-run it whenever you
+want fresh logs.
+
+The boot-time drain stays off on purpose (`INVITE_HUB_SYNC_ON_BOOT`, forced off for
+the local container). That flag is what keeps the app responsive on a fresh database,
+where syncing the whole Hub history on the startup path would otherwise starve the API
+and reset connections.
+
 ### Caveats
 
 Both are Docker-on-Mac quirks rather than anything about the setup itself:

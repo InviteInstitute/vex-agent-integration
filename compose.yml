@@ -11,6 +11,12 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
+    environment:
+      # Never drain the whole Invite Hub history on the API's startup path -- against a
+      # fresh database that starves the app and resets connections. Forced off for the
+      # local container unless a dev explicitly opts in via .env. Pull Hub logs on
+      # demand instead (see the README).
+      INVITE_HUB_SYNC_ON_BOOT: "${INVITE_HUB_SYNC_ON_BOOT:-false}"
     ports:
       - "127.0.0.1:5173:5173"   # the UI (open this)
       - "127.0.0.1:8001:8000"   # the API (the browser + client call this)
