@@ -820,10 +820,7 @@ function App() {
                   onPointerDown={(event) => event.stopPropagation()}
                 >
                   <h2>Start Chat</h2>
-                  <p>
-                    Enter your student ID. Session ID is optional if you want to target a specific
-                    test session.
-                  </p>
+                  <p>Enter your student ID to begin.</p>
                   <form className="start-form" onSubmit={handleStudentStart}>
                     <label className="sr-only" htmlFor="student-id">
                       Student ID
@@ -834,18 +831,6 @@ function App() {
                       value={studentIdDraft}
                       onChange={(event) => setStudentIdDraft(event.target.value)}
                       placeholder="Student ID"
-                      autoComplete="off"
-                      disabled={pendingAction === "session"}
-                    />
-                    <label className="sr-only" htmlFor="session-id">
-                      Session ID
-                    </label>
-                    <input
-                      id="session-id"
-                      type="text"
-                      value={sessionIdDraft}
-                      onChange={(event) => setSessionIdDraft(event.target.value)}
-                      placeholder="Session ID (optional)"
                       autoComplete="off"
                       disabled={pendingAction === "session"}
                     />
