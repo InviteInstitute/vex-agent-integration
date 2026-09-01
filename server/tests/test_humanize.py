@@ -1,7 +1,7 @@
 """humanize: readable program listing with parameters. Vendored from the
 self-check in lm-dashboard/app/runs/humanize.py (no dedicated test file there)."""
 
-from vex_agent.triggers.humanize import humanize_text, humanize_workspace
+from log_parser_delta_engine import generate_readable_lines, generate_readable_text
 
 DEMO = (
     "<xml>"
@@ -27,35 +27,35 @@ DEMO = (
 
 
 def test_empty_and_unparseable_return_empty():
-    assert humanize_workspace("") == []
-    assert humanize_workspace("<xml><unclosed>") == []
+    assert generate_readable_lines("") == []
+    assert generate_readable_lines("<xml><unclosed>") == []
 
 
 def test_value_slot_numbers_are_preserved():
     # the key feature: drive distance "200" lives in a <value> shadow the
     # edit-distance AST drops, but humanize keeps it.
-    lines = humanize_workspace(DEMO)
+    lines = generate_readable_lines(DEMO)
     assert any("200" in ln for ln in lines)
 
 
 def test_if_else_branch_is_labeled():
-    lines = humanize_workspace(DEMO)
+    lines = generate_readable_lines(DEMO)
     assert any("else:" == ln.strip() for ln in lines)
 
 
 def test_nested_condition_is_rendered_infix():
-    lines = humanize_workspace(DEMO)
+    lines = generate_readable_lines(DEMO)
     # not ( ... and ... < 200 )
     assert any("not (" in ln and "and" in ln and "< 200" in ln for ln in lines)
 
 
 def test_mutator_fields_are_hidden():
     # anddontwait_mutator is Blockly plumbing; it must not appear in the output
-    lines = humanize_workspace(DEMO)
+    lines = generate_readable_lines(DEMO)
     assert all("anddontwait_mutator" not in ln for ln in lines)
 
 
-def test_humanize_text_joins_lines():
-    text = humanize_text(DEMO)
+def test_generate_readable_text_joins_lines():
+    text = generate_readable_text(DEMO)
     assert isinstance(text, str)
     assert "200" in text

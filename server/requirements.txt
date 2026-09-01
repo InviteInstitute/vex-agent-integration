@@ -1,4 +1,6 @@
 # Runtime dependencies now live in pyproject.toml (single source of truth).
 # This file stays so `pip install -r requirements.txt` keeps working (Docker/Render).
-# Local dev + tests:  pip install -e '.[dev]'
+# Local dev + tests:  pip install -e ./vendor/agent-lm-packages && pip install -e '.[dev]'
+# The shared trigger/learner-model engine, vendored as a git submodule.
+-e ./vendor/agent-lm-packages
 .

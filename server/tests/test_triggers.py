@@ -3,9 +3,13 @@
 Run from server/:  PYTHONPATH=. ../.venv/bin/python -m pytest tests/test_triggers.py
 """
 
-from vex_agent.triggers.ast_builder import extract_workspace_xml, xml_to_block_ast
-from vex_agent.triggers.detectors import detect_run_triggers, detect_run_triggers_by_playground
-from vex_agent.triggers.distance import cached_edit_distance, compute_edit_distance
+from learner_models import (
+    detect_run_triggers,
+    detect_run_triggers_by_playground,
+    extract_workspace_xml,
+    xml_to_block_ast,
+)
+from learner_models.distance import cached_edit_distance, compute_edit_distance
 
 XMLNS = 'xmlns="https://developers.google.com/blockly/xml"'
 WS_ONE = f'<xml {XMLNS}><block type="pg_events_when_started" id="s"></block></xml>'

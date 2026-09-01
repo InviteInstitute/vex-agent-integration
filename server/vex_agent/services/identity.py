@@ -15,6 +15,8 @@ stops the two spellings of one student from oscillating a switch every tick.
 import logging
 from uuid import UUID
 
+from learner_models import detect_switches
+
 from vex_agent.data.db import (
     canon_id,
     get_identity_state,
@@ -22,7 +24,6 @@ from vex_agent.data.db import (
     record_switch,
     upsert_identity_state,
 )
-from vex_agent.triggers.switches import detect_switches
 
 log = logging.getLogger(__name__)
 
