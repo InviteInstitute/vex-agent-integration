@@ -2,9 +2,10 @@
 
 from datetime import UTC, datetime, timedelta
 
+from learner_models.constants import INACTIVE_TRIGGER_SECONDS
+
 from vex_agent.domain.feedback_policy import FeedbackClass
 from vex_agent.services.proactive import ACTED_TRIGGERS, feedback_classes_for_trigger, is_inactive
-from vex_agent.triggers.constants import INACTIVE_TRIGGER_SECONDS
 
 
 def test_resilience_and_inactive_are_acted():

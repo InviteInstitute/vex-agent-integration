@@ -195,8 +195,8 @@ def _events_to_segmenter_input(events: list[EventRecord]) -> list[dict]:
 
 def segment_episodes_for_events(events: list[EventRecord]) -> tuple[list[dict], list[dict]]:
     """Segment an EventRecord list into CODE/RUN/RESET episodes + pauses, via the
-    vendored episode_engine. Returns (episodes, pauses). Pure (no DB)."""
-    from vex_agent.triggers.episode_engine import segment_session
+    shared learner_models engine. Returns (episodes, pauses). Pure (no DB)."""
+    from learner_models import segment_session
 
     if not events:
         return [], []

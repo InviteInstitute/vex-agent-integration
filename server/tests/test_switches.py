@@ -1,7 +1,8 @@
 """Identity-switch detection + canon_id (vendored from lm-dashboard)."""
 
+from learner_models import detect_switches
+
 from vex_agent.data.db import canon_id
-from vex_agent.triggers.switches import detect_switches
 
 
 def test_casing_switch_detected():

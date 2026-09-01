@@ -355,9 +355,11 @@ def build_current_program(
     project snapshot exists.
 
     Pass `events` to skip a redundant DB fetch (the reactive route already has them)."""
-    from vex_agent.triggers.ast_builder import extract_workspace_xml
-    from vex_agent.triggers.humanize import humanize_text
-    from vex_agent.triggers.smart_delta import generate_llm_prompt_from_project
+    from learner_models import extract_workspace_xml
+    from log_parser_delta_engine import (
+        generate_compact_prompt_from_project,
+        generate_readable_text,
+    )
 
     if events is None:
         events = fetch_events_from_db(student_id=student_id, session_id=session_id)
@@ -379,17 +381,17 @@ def build_current_program(
     if not latest_project:
         return ""
 
-    # smart_delta's bootstrap accepts a project dict (it json.loads strings, passes
-    # dicts through). Prefer its [Active]/[Orphaned] render; fall back to humanize's
-    # readable listing (which keeps <value> parameter numbers smart_delta drops).
-    prompt = generate_llm_prompt_from_project(
+    # The bootstrap accepts a project dict (it json.loads strings, passes dicts
+    # through). Prefer the compact [Active]/[Orphaned] render; fall back to the
+    # readable listing when it yields nothing.
+    prompt = generate_compact_prompt_from_project(
         json.dumps(latest_project) if not isinstance(latest_project, str) else latest_project
     )
     if prompt:
         return prompt
 
     workspace_xml = extract_workspace_xml({"project": latest_project})
-    return humanize_text(workspace_xml)
+    return generate_readable_text(workspace_xml)
 
 
 # Neutral, plain-language readings of the deterministic snapshot signals. Never the

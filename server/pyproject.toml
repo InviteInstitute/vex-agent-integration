@@ -12,7 +12,9 @@ dependencies = [
     "openai==1.108.1",
     "psycopg[binary]==3.2.10",
     "python-dotenv==1.1.1",
-    "apted>=1.0",              # per-run code-diff signal: APTED tree-edit distance (trigger engine)
+    # The trigger + learner-model engine (and its apted dependency) come from the
+    # agent-lm-packages submodule, installed editable from server/vendor
+    # (see the Dockerfile and requirements.txt).
     "uvicorn==0.35.0",
     "itsdangerous>=2.1",       # signs the "solved Turnstile" cookie (api/turnstile)
     "httpx",                   # Turnstile siteverify (also pulled in by openai)
@@ -27,9 +29,6 @@ vex-fetch-logs = "vex_agent.ingest.fetch_invite_hub_logs:main"
 
 [tool.setuptools.packages.find]
 include = ["vex_agent*"]
-
-[tool.setuptools.package-data]
-vex_agent = ["triggers/vex_blocks.json"]
 
 # Ruff owns linting and formatting. This block is kept identical to lm-dashboard
 # so both repos lint and format the same way.

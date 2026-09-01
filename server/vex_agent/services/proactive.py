@@ -1,6 +1,7 @@
-"""App-level glue between the agent's EventRecord stream and the pure vendored
-trigger engine (server/src/triggers/). The engine stays framework/DB-free; this
-module does the adapting so the coupling points one way (app -> engine)."""
+"""App-level glue between the agent's EventRecord stream and the shared
+trigger engine (the agent-lm-packages submodule: learner_models /
+log_parser_delta_engine). The engine stays framework/DB-free; this module does
+the adapting so the coupling points one way (app -> engine)."""
 
 from __future__ import annotations
 
@@ -8,6 +9,9 @@ import logging
 import os
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
+
+from learner_models import compute_run_edit_distances, detect_run_triggers_by_playground
+from learner_models.constants import INACTIVE_TRIGGER_SECONDS, RE_ALERT_SECONDS, TRIGGER_LABELS
 
 from vex_agent.config import DEFAULT_PLAYGROUND
 from vex_agent.data.db import (
@@ -23,9 +27,6 @@ from vex_agent.domain.metrics import EventRecord
 from vex_agent.services.feedback import generate_feedback
 from vex_agent.services.identity import track_identity_switches
 from vex_agent.services.sessions import append_session_message
-from vex_agent.triggers.constants import INACTIVE_TRIGGER_SECONDS, RE_ALERT_SECONDS, TRIGGER_LABELS
-from vex_agent.triggers.detectors import detect_run_triggers_by_playground
-from vex_agent.triggers.run_sequence import compute_run_edit_distances
 
 log = logging.getLogger(__name__)
 
