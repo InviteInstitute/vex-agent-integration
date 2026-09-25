@@ -36,6 +36,11 @@ else
   echo "Updated $BEFORE -> $AFTER"
 fi
 
+# The trigger/learner-model engine is the agent-lm-packages git submodule under
+# server/vendor/. Sync it to the commit the pull just recorded, or the image builds
+# against stale vendored code and a pin bump never ships.
+git submodule update --init --recursive
+
 echo "Building + rolling the stack ..."
 docker compose -f compose.yml up -d --build
 

@@ -7,10 +7,17 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
+from collections import OrderedDict
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from learner_models import compute_run_edit_distances, detect_run_triggers_by_playground
+from learner_models import (
+    RunDistanceStream,
+    compute_run_edit_distances,
+    detect_run_triggers_by_playground,
+)
 from learner_models.constants import INACTIVE_TRIGGER_SECONDS, RE_ALERT_SECONDS, TRIGGER_LABELS
 
 from vex_agent.config import DEFAULT_PLAYGROUND
@@ -47,26 +54,43 @@ ACTED_TRIGGERS = {"wheel_spin", "resilience", "inactive", "explorer", "iterative
 # it) when the last event is older than the idle threshold.
 INACTIVE_RUN_INDEX = -1
 
-# --- Debounced run-distance cache (ported pattern from lm-dashboard's StudentWorker) ---
-# Detection is deterministic, so the per-run edit-distance sequence for a session only
-# changes when a new runProject lands. Cache it keyed on a signature derived from the
-# fetched events; a tick with no new runs skips the full APTED recompute.
-_runs_cache: dict[tuple[str, str], tuple[tuple, list[dict]]] = {}
+# --- Incremental run distances, one stream per session ---
+# Each tick fetches the session's events, but only the ones that arrived since the
+# last tick are fed to the session's RunDistanceStream, so a tick costs the new
+# events instead of re-parsing every run in the session. If the fetched list is no
+# longer an extension of what the stream saw (an event landed earlier in event_ts
+# order), the stream is rebuilt from the full list. Bounded as an LRU so sessions
+# that have ended don't pile up.
+_RUN_STREAMS_MAX = 512
 
 
-def _runs_signature(events: list[EventRecord]) -> tuple:
-    """A cheap fingerprint of the event list. Changes when events are appended
-    (length grows, last id changes) so the cache invalidates exactly when the
-    run sequence could differ."""
-    if not events:
-        return (0, 0)
-    last = events[-1]
-    return (len(events), getattr(last, "id", 0) or 0)
+@dataclass
+class _SessionRuns:
+    stream: RunDistanceStream = field(default_factory=RunDistanceStream)
+    fed: int = 0  # events fed so far
+    last_id: int | None = None  # id of the last event fed
+
+
+_run_streams: OrderedDict[tuple[str, str], _SessionRuns] = OrderedDict()
+_run_streams_lock = threading.Lock()
+
+
+def _extends(entry: _SessionRuns, events: list[EventRecord]) -> bool:
+    """True when `events` is what the stream already saw plus new events at the
+    end. The event at the stream's last position must be the same row; an insert
+    anywhere before it shifts that position to a different row."""
+    if entry.fed == 0:
+        return True
+    if len(events) < entry.fed:
+        return False
+    last = events[entry.fed - 1].id
+    return last is not None and last == entry.last_id
 
 
 def clear_run_cache() -> None:
-    """Drop the run-distance cache. Test hook (conftest calls it between tests)."""
-    _runs_cache.clear()
+    """Drop every session's run stream. Test hook (conftest calls it between tests)."""
+    with _run_streams_lock:
+        _run_streams.clear()
 
 
 def disabled_trigger_types() -> set[str]:
@@ -114,11 +138,11 @@ def compute_run_distances(events: list[EventRecord]) -> list[dict]:
 
 
 def compute_run_distances_for_session(student_id: str, session_id: str) -> list[dict]:
-    """Fetch a session's events from the DB and compute the per-run distance sequence.
+    """Fetch a session's events from the DB and return the per-run distance sequence.
 
-    Cached: the APTED recompute is skipped when the fetched events have the same
-    signature as the last call (no new runProject landed). Detection is
-    deterministic, so a cache hit returns the same sequence."""
+    Incremental: only events that arrived since the last call are fed to the
+    session's run stream, which gives exactly what compute_run_distances would
+    over the full list."""
     events = fetch_events_from_db(student_id=student_id, session_id=session_id)
     return _compute_run_distances_cached(student_id, session_id, events)
 
@@ -128,14 +152,20 @@ def _compute_run_distances_cached(
     session_id: str,
     events: list[EventRecord],
 ) -> list[dict]:
-    sig = _runs_signature(events)
     key = (student_id, session_id)
-    cached = _runs_cache.get(key)
-    if cached is not None and cached[0] == sig:
-        return cached[1]
-    runs = compute_run_distances(events)
-    _runs_cache[key] = (sig, runs)
-    return runs
+    with _run_streams_lock:
+        entry = _run_streams.get(key)
+        if entry is None or not _extends(entry, events):
+            entry = _SessionRuns()
+        for event in events[entry.fed :]:
+            entry.stream.push(_event_record_to_engine_dict(event))
+        entry.fed = len(events)
+        entry.last_id = events[-1].id if events else None
+        _run_streams[key] = entry
+        _run_streams.move_to_end(key)
+        while len(_run_streams) > _RUN_STREAMS_MAX:
+            _run_streams.popitem(last=False)
+        return list(entry.stream.runs)
 
 
 def detect_triggers_for_session(student_id: str, session_id: str) -> list[tuple]:
@@ -203,8 +233,8 @@ def persist_new_triggers(student_id: str, session_id: str) -> list[dict]:
     ones get ACTED on is the caller's policy (ACTED_TRIGGERS minus disabled_trigger_types).
 
     Fetches the session's events once and reuses them for both the momentary
-    (edit-distance) and sustained (inactive) detectors, and shares the run-distance
-    cache with compute_run_distances_for_session. When the student is NOT idle, any
+    (edit-distance) and sustained (inactive) detectors, and shares the per-session
+    run stream with compute_run_distances_for_session. When the student is NOT idle, any
     open inactive trigger is resolved (the student recovered)."""
     events = fetch_events_from_db(student_id=student_id, session_id=session_id)
     runs = _compute_run_distances_cached(student_id, session_id, events)
