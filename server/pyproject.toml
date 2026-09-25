@@ -30,6 +30,12 @@ vex-fetch-logs = "vex_agent.ingest.fetch_invite_hub_logs:main"
 [tool.setuptools.packages.find]
 include = ["vex_agent*"]
 
+# Scope pytest to this repo's own suite. The agent-lm-packages submodule ships its
+# own tests under vendor/ (some need its root conftest and optional extras); they
+# are validated in that repo, not here.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 # Ruff owns linting and formatting. This block is kept identical to lm-dashboard
 # so both repos lint and format the same way.
 [tool.ruff]
