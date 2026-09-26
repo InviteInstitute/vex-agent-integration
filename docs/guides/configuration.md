@@ -45,9 +45,12 @@ what students get.
    the browser. Each reply shows the model, the settings, the tokens it spent, and the
    exact prompt sent.
 
-Only replies from a browser with changed settings use them. Those replies are stored with
-`origin = 'research'` in `chat.messages`, so they stay out of student data. Proactive
-check-ins always use production settings.
+The research view is its own conversation, separate from the student view: switching
+the toggle switches chats. Each keeps its own recent turns on the server, so a research
+experiment never shows up in the context of a student-view reply, and everything sent
+from the research chat is stored with `origin = 'research'` in `chat.messages`, keeping
+it out of student data. Proactive check-ins appear in both chats, with their trigger in
+the research one, and always use production settings.
 
 ### Token budgets
 

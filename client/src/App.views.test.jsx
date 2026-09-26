@@ -76,6 +76,38 @@ describe("student and research views", () => {
     expect(window.localStorage.getItem("vex-agent:view")).toBe("research");
   });
 
+  it("keeps the student chat and the research chat separate", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(screen.getByLabelText("Student ID"), "mars-042");
+    await user.click(screen.getByRole("button", { name: "Start chat" }));
+    await screen.findByRole("region", { name: "Conversation" });
+
+    await user.type(screen.getByLabelText("Message"), "question from the student view");
+    await user.click(screen.getByRole("button", { name: /Send/ }));
+    expect(await screen.findByText("question from the student view")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Research" }));
+    expect(screen.queryByText("question from the student view")).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Message"), "experiment from the research view");
+    await user.click(screen.getByRole("button", { name: /Send/ }));
+    expect(await screen.findByText("experiment from the research view")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Student" }));
+    expect(screen.getByText("question from the student view")).toBeInTheDocument();
+    expect(screen.queryByText("experiment from the research view")).not.toBeInTheDocument();
+
+    const sentChats = fetch.mock.calls
+      .filter(([url]) => url.endsWith("/messages") || url.endsWith("/responses"))
+      .map(([url, options]) => [url.split("/").pop(), JSON.parse(options.body).chat]);
+    expect(sentChats).toEqual([
+      ["messages", "student"],
+      ["responses", "student"],
+      ["messages", "research"],
+      ["responses", "research"],
+    ]);
+  });
+
   it("counts replies that arrive while the chat is collapsed", async () => {
     const user = userEvent.setup();
     render(<App />);

@@ -21,7 +21,7 @@ from vex_agent.llm.client import (
     GenerationSettings,
     generate_main_llm_response,
 )
-from vex_agent.services.sessions import get_recent_session_messages
+from vex_agent.services.sessions import STUDENT_CHAT, get_recent_session_messages
 
 
 def generate_feedback(
@@ -34,6 +34,7 @@ def generate_feedback(
     behavior_fact: str | None = None,
     events=None,
     settings: GenerationSettings = DEFAULT_GENERATION_SETTINGS,
+    chat: str = STUDENT_CHAT,
 ) -> dict:
     """Run the shared context-assembly + single-pass LLM generation.
 
@@ -66,7 +67,7 @@ def generate_feedback(
         available_blocks=available_blocks,
         current_program=current_program,
         situation=situation,
-        recent_messages=get_recent_session_messages(student_id, playground, session_id),
+        recent_messages=get_recent_session_messages(student_id, playground, session_id, chat),
         feedback_classes=feedback_classes,
         settings=settings,
     )
