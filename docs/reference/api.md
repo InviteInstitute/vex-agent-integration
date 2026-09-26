@@ -186,7 +186,7 @@ and `models_error` says why.
 ```json title="Response"
 {
   "defaults": { "model": "qwen3.8-27b", "max_tokens": 160, "trim_reply": true },
-  "models": ["gemma-4-31b-it", "glm-5.3", "qwen3.8-27b"],
+  "models": ["gemma-4-31b-it", "glm-5.3-flash", "qwen3.8-27b"],
   "models_error": null,
   "prompt_template": "You are an educational feedback assistant for VEXcode VR…",
   "placeholders": { "task": "The playground's task description.", "…": "…" },

@@ -93,17 +93,13 @@ def test_strip_thinking_handles_a_template_opened_block():
     assert strip_thinking("No reasoning at all.") == "No reasoning at all."
 
 
-def test_model_list_leaves_out_models_that_cannot_chat(monkeypatch):
-    def model(model_id, **extra):
-        return SimpleNamespace(id=model_id, model_extra=extra)
-
+def test_model_list_keeps_only_research_models_lumen_serves(monkeypatch):
     listing = SimpleNamespace(
         data=[
-            model("qwen3.8-27b", input_modalities=["text"], output_modalities=["text"]),
-            model("granite-speech-4.1-2b-plus", input_modalities=["audio"]),
-            model("ollama-model"),
+            SimpleNamespace(id=model_id)
+            for model_id in ["qwen3.8-27b", "granite-speech-4.1-2b-plus", "glm", "gemma-4-31b-it"]
         ]
     )
     fake = SimpleNamespace(models=SimpleNamespace(list=lambda: listing))
     monkeypatch.setattr(ls, "get_openai_client", lambda: fake)
-    assert ls.list_available_models() == ["ollama-model", "qwen3.8-27b"]
+    assert ls.list_available_models() == ["gemma-4-31b-it", "qwen3.8-27b"]

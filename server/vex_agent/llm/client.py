@@ -138,20 +138,28 @@ def _thinking_enabled() -> bool:
     return os.getenv("LLM_ENABLE_THINKING", "false").lower() in ("1", "true", "yes", "on")
 
 
-def _is_chat_model(model) -> bool:
-    """Text in, text out. Gateways that publish modalities (Lumen does) also serve
-    speech and other models the agent can't use; ones that don't publish them list
-    only chat models, so a missing field counts as chat."""
-    extra = model.model_extra or {}
-    inputs = extra.get("input_modalities")
-    outputs = extra.get("output_modalities")
-    return (inputs is None or "text" in inputs) and (outputs is None or "text" in outputs)
+# The chat models researchers can pick from on the Agent tab. Lumen also serves
+# aliases (glm, glm-5.3) and non-chat models (granite-speech) that stay off the list.
+RESEARCH_MODELS = frozenset(
+    {
+        "deepseek-v4-flash",
+        "gemma-4-31b-it",
+        "glm-5.3-flash",
+        "muse-glimmer-30b",
+        "nemotron-3-super-120b-a12b",
+        "ornith-1.0-35b",
+        "qwen3-coder-next",
+        "qwen3.6-35b-a3b",
+        "qwen3.8-27b",
+    }
+)
 
 
 def list_available_models() -> list[str]:
-    """Chat model ids the configured OpenAI-compatible endpoint (Lumen in prod) serves."""
+    """The research models the configured OpenAI-compatible endpoint (Lumen in prod)
+    currently serves, so one it stops serving drops off the list."""
     return sorted(
-        model.id for model in get_openai_client().models.list().data if _is_chat_model(model)
+        model.id for model in get_openai_client().models.list().data if model.id in RESEARCH_MODELS
     )
 
 
