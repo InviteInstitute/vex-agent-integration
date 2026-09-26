@@ -2,8 +2,9 @@ import logging
 from time import monotonic
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 
+from vex_agent.api.research import require_research_key
 from vex_agent.api.schemas import (
     FeedbackRequest,
     FeedbackResponse,
@@ -28,6 +29,7 @@ from vex_agent.domain.metrics import (
     has_active_project_run,
     select_current_playground_segment,
 )
+from vex_agent.llm.client import DEFAULT_GENERATION_SETTINGS, GenerationSettings
 from vex_agent.services.feedback import generate_feedback
 from vex_agent.services.logsync import sync_invite_hub_logs
 from vex_agent.services.sessions import append_session_message
@@ -159,7 +161,17 @@ def create_message(student_id: str, payload: MessageRequest) -> MessageResponse:
 def create_response(
     student_id: str,
     payload: StudentResponseRequest,
+    x_research_key: str | None = Header(default=None),
 ) -> StudentResponseResponse:
+    # Research overrides change what the model sees, so they need the research key.
+    # Replies made with them are stored as origin='research' to keep them apart from
+    # what students were actually shown.
+    settings = DEFAULT_GENERATION_SETTINGS
+    origin = "reactive"
+    if payload.overrides is not None:
+        require_research_key(x_research_key)
+        settings = GenerationSettings(**payload.overrides.model_dump())
+        origin = "research"
     response_id = uuid4()
     resolved_session_id = payload.session_id
     resolved_playground = payload.playground or DEFAULT_PLAYGROUND
@@ -244,6 +256,7 @@ def create_response(
                 feedback_classes=feedback_classes,
                 student_message=payload.student_message,
                 events=events,
+                settings=settings,
             )
             llm_request = result["llm_request"]
             log_stage(
@@ -257,6 +270,8 @@ def create_response(
                 student_id=student_id,
                 session_id=resolved_session_id,
                 model=llm_request["model"],
+                origin=origin,
+                settings=settings,
                 prompt=llm_request["prompt"],
             )
             response_text = llm_request["response_text"]
@@ -291,6 +306,7 @@ def create_response(
         if feedback_classes
         else None,
         response_id=response_id,
+        origin=origin,
     )
     log_stage(
         "Assistant Response Sent",

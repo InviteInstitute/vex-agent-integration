@@ -32,6 +32,24 @@ class SessionResolutionResponse(BaseModel):
     status: Literal["resolved"]
 
 
+class ResearchOverrides(BaseModel):
+    """Agent settings a researcher tries from the research preview. Only honored with
+    a valid X-Research-Key header. A field left out keeps the production default."""
+
+    model: str | None = Field(default=None, max_length=200, description="Model id to call.")
+    prompt_template: str | None = Field(
+        default=None,
+        max_length=50_000,
+        description="Replacement prompt template. {placeholders} are filled in; see /v1/research/config.",
+    )
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    max_tokens: int | None = Field(default=None, ge=16, le=4096)
+    trim_to_one_sentence: bool = Field(
+        default=True,
+        description="Trim the reply to one short sentence, as students get it.",
+    )
+
+
 class StudentResponseRequest(BaseModel):
     message_id: str | None = Field(
         default=None,
@@ -52,6 +70,10 @@ class StudentResponseRequest(BaseModel):
     student_message: str | None = Field(
         default=None,
         description="Raw student chat message to include in the main LLM prompt.",
+    )
+    overrides: ResearchOverrides | None = Field(
+        default=None,
+        description="Research-only agent settings; requires the X-Research-Key header.",
     )
 
 
@@ -81,3 +103,17 @@ class FeedbackResponse(BaseModel):
     thumb: Literal["up", "down"]
     comment: str | None
     status: Literal["received"]
+
+
+class ResearchDefaults(BaseModel):
+    model: str
+    max_tokens: int
+    trim_to_one_sentence: bool
+
+
+class ResearchConfigResponse(BaseModel):
+    defaults: ResearchDefaults
+    models: list[str]
+    models_error: str | None = None
+    prompt_template: str
+    placeholders: dict[str, str]

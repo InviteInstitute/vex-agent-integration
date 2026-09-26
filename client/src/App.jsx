@@ -8,6 +8,11 @@ import {
   ThumbsUp,
   WarningCircle,
 } from "@phosphor-icons/react";
+import ResearchLab, {
+  EMPTY_AGENT_SETTINGS,
+  buildOverrides,
+  describeOverrides,
+} from "./ResearchLab";
 
 const defaultApiBase = import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8000/v1";
 
@@ -114,6 +119,27 @@ export function renderMessageBody(text) {
 }
 
 const VIEW_STORAGE_KEY = "vex-agent:view";
+const RESEARCH_KEY_STORAGE_KEY = "vex-agent:research-key";
+const AGENT_SETTINGS_STORAGE_KEY = "vex-agent:agent-settings";
+
+function readStored(key, fallback) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw === null ? fallback : JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStored(key, value) {
+  try {
+    if (value === null) {
+      window.localStorage.removeItem(key);
+    } else {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    }
+  } catch {}
+}
 
 // Student view is what a student sees in class; research view adds the
 // telemetry behind each message (proactive trigger, model, session id).
@@ -220,6 +246,15 @@ function App() {
   const [isInteractingWithPanel, setIsInteractingWithPanel] = useState(false);
   const [hoveredResizeHandle, setHoveredResizeHandle] = useState(null);
   const [view, setView] = useState(readStoredView);
+  const [researchTab, setResearchTab] = useState("chat");
+  const [researchKey, setResearchKey] = useState(() => readStored(RESEARCH_KEY_STORAGE_KEY, null));
+  const [researchConfig, setResearchConfig] = useState(null);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState("");
+  const [agentSettings, setAgentSettings] = useState(() => ({
+    ...EMPTY_AGENT_SETTINGS,
+    ...readStored(AGENT_SETTINGS_STORAGE_KEY, {}),
+  }));
   const [seenMessageCount, setSeenMessageCount] = useState(0);
   const panelRef = useRef(null);
   const interactionRef = useRef(null);
@@ -230,6 +265,10 @@ function App() {
   const isStartModeRef = useRef(true);
   isStartModeRef.current = !studentId;
   const isResearchView = view === "research";
+  // Overrides only ever leave this browser in research view with a checked key.
+  const agentOverrides =
+    isResearchView && researchKey ? buildOverrides(agentSettings, researchConfig) : null;
+  const showAgentTab = isResearchView && researchTab === "agent";
   // The start card sizes to its content; only the chat itself is resizable.
   const canResize = Boolean(studentId);
 
@@ -245,6 +284,17 @@ function App() {
       window.localStorage.setItem(VIEW_STORAGE_KEY, view);
     } catch {}
   }, [view]);
+
+  useEffect(() => {
+    writeStored(AGENT_SETTINGS_STORAGE_KEY, agentSettings);
+  }, [agentSettings]);
+
+  useEffect(() => {
+    if (isResearchView && studentId && researchKey && !researchConfig && !isUnlocking) {
+      loadResearchConfig(researchKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isResearchView, studentId, researchKey]);
 
   const collapseChat = () => {
     setSeenMessageCount(messages.length);
@@ -497,11 +547,12 @@ function App() {
     }
   };
 
-  const postJson = async (path, payload) => {
+  const postJson = async (path, payload, headers = {}) => {
     const response = await fetch(`${apiBase}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...headers,
       },
       body: JSON.stringify(payload),
     });
@@ -516,8 +567,8 @@ function App() {
     return data;
   };
 
-  const getJson = async (path) => {
-    const response = await fetch(`${apiBase}${path}`);
+  const getJson = async (path, headers = {}) => {
+    const response = await fetch(`${apiBase}${path}`, { headers });
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
@@ -526,6 +577,28 @@ function App() {
     }
 
     return data;
+  };
+
+  const loadResearchConfig = async (key) => {
+    setIsUnlocking(true);
+    setUnlockError("");
+    try {
+      const config = await getJson("/research/config", { "X-Research-Key": key });
+      setResearchConfig(config);
+      setResearchKey(key);
+      writeStored(RESEARCH_KEY_STORAGE_KEY, key);
+    } catch (error) {
+      setResearchConfig(null);
+      setUnlockError(error.message);
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  const forgetResearchKey = () => {
+    setResearchKey(null);
+    setResearchConfig(null);
+    writeStored(RESEARCH_KEY_STORAGE_KEY, null);
   };
 
   const updateMessage = (messageId, updater) => {
@@ -663,11 +736,16 @@ function App() {
       };
       const messageResponse = await postJson(`/students/${studentId}/messages`, messagePayload);
       setSessionId(messageResponse.session_id);
-      const responseRecord = await postJson(`/students/${studentId}/responses`, {
-        message_id: messageResponse.message_id,
-        session_id: messageResponse.session_id,
-        student_message: studentMessage,
-      });
+      const responseRecord = await postJson(
+        `/students/${studentId}/responses`,
+        {
+          message_id: messageResponse.message_id,
+          session_id: messageResponse.session_id,
+          student_message: studentMessage,
+          ...(agentOverrides ? { overrides: agentOverrides } : {}),
+        },
+        agentOverrides ? { "X-Research-Key": researchKey } : {},
+      );
       setSessionId(responseRecord.session_id);
       setMessages((current) =>
         current.map((entry) =>
@@ -679,6 +757,11 @@ function App() {
                   role: "assistant",
                   body: responseRecord.response_text,
                   model: responseRecord.llm_model || null,
+                  prompt: responseRecord.llm_prompt || null,
+                  // The Model row already names the model; list only the other overrides.
+                  custom: agentOverrides
+                    ? describeOverrides({ ...agentOverrides, model: undefined }) || null
+                    : null,
                   canFeedback: true,
                 }
               : entry,
@@ -763,21 +846,34 @@ function App() {
     if (message.model) {
       rows.push(["Model", <code key="m">{message.model}</code>]);
     }
+    if (message.custom) {
+      rows.push(["Settings", message.custom]);
+    }
     if (message.error) {
       rows.push(["Error", message.error]);
     }
-    if (!rows.length) {
+    if (!rows.length && !message.prompt) {
       return null;
     }
     return (
-      <dl className="research-details">
-        {rows.map(([term, detail]) => (
-          <div key={term}>
-            <dt>{term}</dt>
-            <dd>{detail}</dd>
-          </div>
-        ))}
-      </dl>
+      <div className="research-details">
+        {rows.length ? (
+          <dl>
+            {rows.map(([term, detail]) => (
+              <div key={term}>
+                <dt>{term}</dt>
+                <dd>{detail}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+        {message.prompt ? (
+          <details className="prompt-sent">
+            <summary>Prompt sent to the model</summary>
+            <pre>{message.prompt}</pre>
+          </details>
+        ) : null}
+      </div>
     );
   };
 
@@ -868,7 +964,7 @@ function App() {
           className={`chat-overlay ${!studentId ? "chat-overlay-start" : ""} ${
             isInteractingWithPanel ? "is-moving" : ""
           }`}
-          aria-label="Guide Bot chat"
+          aria-label="INVITE Agent chat"
           onPointerDownCapture={handlePanelPointerDownCapture}
           onPointerMove={handlePanelPointerMove}
           onPointerLeave={handlePanelPointerLeave}
@@ -885,7 +981,7 @@ function App() {
         >
           <header className="panel-header" onPointerDown={startDrag}>
             <div className="panel-title">
-              <h1>Guide Bot</h1>
+              <h1>INVITE Agent</h1>
               {studentId ? <span className="panel-student">{studentId}</span> : null}
               {studentId && isResearchView ? (
                 <span className="panel-session" title={sessionId}>
@@ -951,7 +1047,50 @@ function App() {
             </div>
           ) : (
             <>
-              <section className="message-list" aria-label="Conversation" ref={messageListRef}>
+              {isResearchView ? (
+                <div className="research-tabs" role="tablist" aria-label="Research preview">
+                  {[
+                    ["chat", "Chat"],
+                    ["agent", "Agent"],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      id={`research-tab-${value}`}
+                      aria-selected={researchTab === value}
+                      aria-controls={`research-panel-${value}`}
+                      onClick={() => setResearchTab(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {showAgentTab ? (
+                <section
+                  className="research-panel"
+                  id="research-panel-agent"
+                  role="tabpanel"
+                  aria-labelledby="research-tab-agent"
+                >
+                  <ResearchLab
+                    config={researchConfig}
+                    settings={agentSettings}
+                    onSettingsChange={setAgentSettings}
+                    onUnlock={loadResearchConfig}
+                    isUnlocking={isUnlocking}
+                    unlockError={unlockError}
+                    onForgetKey={forgetResearchKey}
+                  />
+                </section>
+              ) : null}
+              <section
+                className="message-list"
+                aria-label="Conversation"
+                ref={messageListRef}
+                hidden={showAgentTab}
+              >
                 {messages.map((message) =>
                   message.role === "student" ? (
                     <article key={message.id} className="turn turn-student">
@@ -968,15 +1107,15 @@ function App() {
                     >
                       {message.proactive ? (
                         <p className="turn-label">
-                          {isResearchView ? "Proactive check-in" : "Guide Bot is checking in"}
+                          {isResearchView ? "Proactive check-in" : "INVITE Agent is checking in"}
                         </p>
                       ) : (
-                        <span className="sr-only">Guide Bot said: </span>
+                        <span className="sr-only">INVITE Agent said: </span>
                       )}
                       <div className="turn-body">
                         {message.isLoading ? (
                           <span className="thinking" role="status">
-                            <span className="sr-only">Guide Bot is thinking</span>
+                            <span className="sr-only">INVITE Agent is thinking</span>
                             <span aria-hidden="true" />
                             <span aria-hidden="true" />
                             <span aria-hidden="true" />
@@ -993,7 +1132,19 @@ function App() {
                 <div ref={messagesEndRef} aria-hidden="true" />
               </section>
 
-              <form className="composer" onSubmit={handleSend}>
+              <form className="composer" onSubmit={handleSend} hidden={showAgentTab}>
+                {agentOverrides ? (
+                  <p className="composer-custom">
+                    Custom agent: {describeOverrides(agentOverrides)}.{" "}
+                    <button
+                      type="button"
+                      className="lab-link"
+                      onClick={() => setResearchTab("agent")}
+                    >
+                      Edit
+                    </button>
+                  </p>
+                ) : null}
                 <div className="composer-field">
                   <label className="sr-only" htmlFor="student-message">
                     Message

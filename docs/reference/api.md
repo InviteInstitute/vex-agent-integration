@@ -26,6 +26,7 @@ is unauthenticated. `/admin/*` sits outside the gate and is meant for internal u
 | `POST` | `/v1/students/{id}/responses` | generate one grounded feedback reply |
 | `POST` | `/v1/students/{id}/responses/{response_id}/feedback` | thumbs up/down on a reply |
 | `GET`  | `/v1/students/{id}/stream` | the live Server-Sent Events stream of pushed messages |
+| `GET`  | `/v1/research/config` | models, defaults, and the live prompt template for the research preview (needs `X-Research-Key`) |
 | `POST` | `/admin/tick` | run one proactive tick by hand (internal) |
 
 ---
@@ -142,6 +143,45 @@ this one and the proactive daemon - run the [same pipeline](../concepts/feedback
 
 If the student's run is still active or they're on the wrong playground, the reply is a
 short instruction to stop or switch first, rather than feedback on stale code.
+
+**Research overrides.** With an `X-Research-Key` header matching `RESEARCH_KEY`, the
+request may carry `overrides` to try other agent settings. Every field is optional; a
+field left out keeps the production default. Without a valid key, a request with
+`overrides` gets `403`. The reply is stored with `origin = 'research'`.
+
+```json title="Request with overrides"
+{
+  "session_id": "…",
+  "student_message": "why won't my robot turn?",
+  "overrides": {
+    "model": "gemma-4-31b-it",
+    "prompt_template": "You tutor a middle schooler. Program:\n{current_program}\nThey asked: {student_message}",
+    "temperature": 0.3,
+    "max_tokens": 300,
+    "trim_to_one_sentence": false
+  }
+}
+```
+
+---
+
+## GET /v1/research/config
+
+What the research preview's Agent tab needs: the models the gateway serves, the
+production defaults, and the live prompt template with its placeholders. Requires the
+`X-Research-Key` header. Returns `404` when `RESEARCH_KEY` is unset and `403` for a
+missing or wrong key. If the gateway can't list models, `models` holds just the default
+and `models_error` says why.
+
+```json title="Response"
+{
+  "defaults": { "model": "qwen3.8-27b", "max_tokens": 160, "trim_to_one_sentence": true },
+  "models": ["gemma-4-31b-it", "glm-5.3", "qwen3.8-27b"],
+  "models_error": null,
+  "prompt_template": "You are an educational feedback assistant for VEXcode VR…",
+  "placeholders": { "task": "The playground's task description.", "…": "…" }
+}
+```
 
 ---
 

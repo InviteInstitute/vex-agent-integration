@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from vex_agent.api.admin import router as admin_router
+from vex_agent.api.research import router as research_router
 from vex_agent.api.stream import router as stream_router
 from vex_agent.api.students import router as students_router
 from vex_agent.api.system import router as system_router
@@ -74,6 +75,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(students_router)
+app.include_router(research_router)
 app.include_router(admin_router)
 app.include_router(stream_router)
 app.include_router(system_router)

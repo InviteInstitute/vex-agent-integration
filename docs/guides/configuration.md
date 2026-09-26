@@ -31,6 +31,27 @@ cp .env.example .env
 | `TRIGGER_DISABLED` | daemon | (empty) | comma-separated trigger types to detect-but-not-act-on (e.g. `inactive,explorer`), still persisted to `agent_triggers` |
 | `SESSION_SECRET` | API | insecure dev default | signs the "this browser solved Turnstile" cookie. Set a long random value in any real deployment or the cookie is forgeable |
 | `TURNSTILE_SECRET` | API | (none) | Cloudflare Turnstile server-side secret. Unset means the bot gate can't verify anyone |
+| `RESEARCH_KEY` | API | (none) | shared secret that unlocks the research preview's Agent tab (other models, prompt edits). Unset turns those tools off |
+
+## Trying Other Models And Prompts
+
+The research preview lets a researcher try any model the gateway serves, edit the prompt
+template, and change temperature, max tokens, and the one-sentence trim, without touching
+what students get.
+
+1. Set `RESEARCH_KEY` in `.env` to a long random value and redeploy.
+2. In the chat panel, switch the footer toggle to **Research**, open the **Agent** tab,
+   and enter the key. It is remembered in that browser.
+3. Pick a model and edit the settings. They apply to your next message and are saved in
+   the browser. Each reply shows the model, the settings, and the exact prompt sent.
+
+Only replies from a browser with the key and changed settings use them. Those replies are
+stored with `origin = 'research'` in `chat.messages`, so they stay out of student data.
+Proactive check-ins always use production settings.
+
+To change what students get, edit `PROMPT_TEMPLATE` (and the feedback specs) in
+`server/vex_agent/domain/context_builder.py`, or set `NAVIGATOR_MODEL`, and ship it
+through a PR. The Agent tab's template editor starts from that live template.
 
 ## The LLM Gateway
 
