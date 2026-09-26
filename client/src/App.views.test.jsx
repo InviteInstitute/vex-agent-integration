@@ -58,7 +58,7 @@ describe("student and research views", () => {
     const user = userEvent.setup();
     await startChatWithCheckIn(user);
 
-    expect(screen.getByText("Guide Bot is checking in")).toBeInTheDocument();
+    expect(screen.getByText("INVITE Agent is checking in")).toBeInTheDocument();
     expect(screen.queryByText("wheel_spinning")).not.toBeInTheDocument();
     expect(screen.queryByText("session-1")).not.toBeInTheDocument();
   });

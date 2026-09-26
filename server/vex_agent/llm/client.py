@@ -1,12 +1,13 @@
 import json
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 import openai
 
 from vex_agent.config import get_navigator_model
-from vex_agent.domain.context_builder import build_feedback_prompt_from_classes
+from vex_agent.domain.context_builder import PROMPT_TEMPLATE, build_feedback_prompt_from_classes
 from vex_agent.domain.feedback_policy import FeedbackClass
 from vex_agent.llm.sanitizer import sanitize_llm_output
 
@@ -22,6 +23,23 @@ MAIN_RESPONSE_MAX_TOKENS = 160
 _client: openai.OpenAI | None = None
 
 
+@dataclass(frozen=True)
+class GenerationSettings:
+    """Knobs a researcher can turn from the research preview. Every field left at its
+    default reproduces exactly what students get: the configured model, PROMPT_TEMPLATE,
+    the provider's default temperature, MAIN_RESPONSE_MAX_TOKENS, and the one-sentence
+    trim."""
+
+    model: str | None = None
+    prompt_template: str | None = None
+    temperature: float | None = None
+    max_tokens: int | None = None
+    trim_to_one_sentence: bool = True
+
+
+DEFAULT_GENERATION_SETTINGS = GenerationSettings()
+
+
 def prepare_main_llm_request(
     task: str,
     student_message: str,
@@ -30,6 +48,7 @@ def prepare_main_llm_request(
     situation: str,
     recent_messages: list[dict[str, str]],
     feedback_classes: set[FeedbackClass],
+    settings: GenerationSettings = DEFAULT_GENERATION_SETTINGS,
 ) -> dict[str, str]:
     prompt = build_feedback_prompt_from_classes(
         task=task,
@@ -39,9 +58,10 @@ def prepare_main_llm_request(
         situation=situation,
         recent_messages=recent_messages,
         feedback_classes=feedback_classes,
+        template=settings.prompt_template or PROMPT_TEMPLATE,
     )
     return {
-        "model": get_navigator_model(),
+        "model": settings.model or get_navigator_model(),
         "prompt": prompt,
     }
 
@@ -98,9 +118,22 @@ def _thinking_enabled() -> bool:
     return os.getenv("LLM_ENABLE_THINKING", "false").lower() in ("1", "true", "yes", "on")
 
 
-def execute_prompt(*, model: str, prompt: str, max_tokens: int | None = None) -> str:
+def list_available_models() -> list[str]:
+    """Model ids the configured OpenAI-compatible endpoint (Lumen in prod) serves."""
+    return sorted(model.id for model in get_openai_client().models.list().data)
+
+
+def execute_prompt(
+    *,
+    model: str,
+    prompt: str,
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+) -> str:
     client = get_openai_client()
     kwargs = {"max_tokens": max_tokens} if max_tokens is not None else {}
+    if temperature is not None:
+        kwargs["temperature"] = temperature
     # Only pass the thinking flag when disabling it; opt-in leaves the request
     # untouched so a non-Qwen server never sees an unknown field.
     if not _thinking_enabled():
@@ -150,6 +183,7 @@ def generate_main_llm_response(
     situation: str,
     recent_messages: list[dict[str, str]],
     feedback_classes: set[FeedbackClass],
+    settings: GenerationSettings = DEFAULT_GENERATION_SETTINGS,
 ) -> dict[str, str]:
     llm_request = prepare_main_llm_request(
         task=task,
@@ -159,13 +193,17 @@ def generate_main_llm_response(
         situation=situation,
         recent_messages=recent_messages,
         feedback_classes=feedback_classes,
+        settings=settings,
     )
     response_text = execute_prompt(
         model=llm_request["model"],
         prompt=llm_request["prompt"],
-        max_tokens=MAIN_RESPONSE_MAX_TOKENS,
+        max_tokens=settings.max_tokens or MAIN_RESPONSE_MAX_TOKENS,
+        temperature=settings.temperature,
     )
-    response_text = enforce_student_response_length(sanitize_llm_output(response_text))
+    response_text = sanitize_llm_output(response_text)
+    if settings.trim_to_one_sentence:
+        response_text = enforce_student_response_length(response_text)
     return {
         "model": llm_request["model"],
         "prompt": llm_request["prompt"],

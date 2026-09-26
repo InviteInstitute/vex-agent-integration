@@ -16,7 +16,11 @@ from the trigger) and passed in.
 from vex_agent.data.db import fetch_events_from_db
 from vex_agent.domain.catalogs import resolve_available_blocks, resolve_task_description
 from vex_agent.domain.context_builder import build_current_program, build_situation_model
-from vex_agent.llm.client import generate_main_llm_response
+from vex_agent.llm.client import (
+    DEFAULT_GENERATION_SETTINGS,
+    GenerationSettings,
+    generate_main_llm_response,
+)
 from vex_agent.services.sessions import get_recent_session_messages
 
 
@@ -29,6 +33,7 @@ def generate_feedback(
     student_message: str = "",
     behavior_fact: str | None = None,
     events=None,
+    settings: GenerationSettings = DEFAULT_GENERATION_SETTINGS,
 ) -> dict:
     """Run the shared context-assembly + single-pass LLM generation.
 
@@ -63,6 +68,7 @@ def generate_feedback(
         situation=situation,
         recent_messages=get_recent_session_messages(student_id, playground, session_id),
         feedback_classes=feedback_classes,
+        settings=settings,
     )
     return {
         "llm_request": llm_request,

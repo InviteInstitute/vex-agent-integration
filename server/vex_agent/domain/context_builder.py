@@ -3,6 +3,7 @@ Context Builder
 """
 
 import json
+import re
 from dataclasses import dataclass, field
 
 from vex_agent.data.db import fetch_events_from_db
@@ -255,6 +256,34 @@ OUTPUT RULES
 """
 
 
+# The fields PROMPT_TEMPLATE fills in, with what each one carries. Researchers editing
+# the template in the research preview see this list, so they know what they can place.
+PROMPT_PLACEHOLDERS = {
+    "task": "The playground's task description.",
+    "available_blocks": "The block catalog for this playground, one block per line.",
+    "current_program": "The student's current workspace, rendered as compact pseudo-code.",
+    "student_message": "What the student typed (or 'Help').",
+    "situation": "Measured telemetry facts: progress, milestones, work pattern, last error.",
+    "recent_chat": "The recent chat turns in this session.",
+    "feedback_types": "The feedback types the policy picked for this turn.",
+    "descriptions": "Descriptions of the picked feedback types.",
+    "examples": "Examples of the picked feedback types.",
+    "extra_notes": "Extra notes for the picked feedback types.",
+}
+
+_PLACEHOLDER_PATTERN = re.compile(r"\{(\w+)\}")
+
+
+def render_prompt_template(template: str, values: dict[str, str]) -> str:
+    """Fill `{name}` placeholders that have a value and leave everything else as
+    written. Unlike str.format, a researcher's edited template can contain stray
+    braces (JSON examples, code) without raising. On PROMPT_TEMPLATE, which has no
+    other braces, this matches str.format exactly."""
+    return _PLACEHOLDER_PATTERN.sub(
+        lambda match: values.get(match.group(1), match.group(0)), template
+    )
+
+
 def build_feedback_prompt(
     task: str,
     student_message: str,
@@ -264,6 +293,7 @@ def build_feedback_prompt(
     recent_chat: str,
     feedback_types: list[str],
     feedback_specs: dict,
+    template: str = PROMPT_TEMPLATE,
 ) -> str:
     feedback_types_text = "\n".join(f"- {t}" for t in feedback_types)
 
@@ -285,17 +315,20 @@ def build_feedback_prompt(
         for t in feedback_types
     )
 
-    return PROMPT_TEMPLATE.format(
-        task=task,
-        student_message=student_message,
-        available_blocks=available_blocks,
-        current_program=current_program,
-        situation=situation,
-        recent_chat=recent_chat,
-        feedback_types=feedback_types_text,
-        descriptions=descriptions_text,
-        examples=examples_text,
-        extra_notes=extra_notes_text,
+    return render_prompt_template(
+        template,
+        {
+            "task": task,
+            "student_message": student_message,
+            "available_blocks": available_blocks,
+            "current_program": current_program,
+            "situation": situation,
+            "recent_chat": recent_chat,
+            "feedback_types": feedback_types_text,
+            "descriptions": descriptions_text,
+            "examples": examples_text,
+            "extra_notes": extra_notes_text,
+        },
     )
 
 
@@ -307,6 +340,7 @@ def build_feedback_prompt_from_classes(
     situation: str,
     recent_messages: list[dict[str, str]],
     feedback_classes: set[FeedbackClass],
+    template: str = PROMPT_TEMPLATE,
 ) -> str:
     feedback_types = []
     for feedback_class in feedback_classes:
@@ -336,6 +370,7 @@ def build_feedback_prompt_from_classes(
         recent_chat=recent_chat,
         feedback_types=feedback_types,
         feedback_specs=FEEDBACK_SPECS,
+        template=template,
     )
 
 
