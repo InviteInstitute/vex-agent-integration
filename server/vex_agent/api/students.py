@@ -33,7 +33,7 @@ from vex_agent.llm.client import DEFAULT_GENERATION_SETTINGS, GenerationSettings
 from vex_agent.services import budget
 from vex_agent.services.feedback import generate_feedback
 from vex_agent.services.logsync import sync_invite_hub_logs
-from vex_agent.services.sessions import append_session_message
+from vex_agent.services.sessions import RESEARCH_CHAT, append_session_message
 
 router = APIRouter(prefix="/v1", tags=["students"])
 logger = logging.getLogger(__name__)
@@ -132,12 +132,14 @@ def create_message(student_id: str, payload: MessageRequest) -> MessageResponse:
         session_id=resolved_session_id,
         role="student",
         content=student_message_text,
+        chat=payload.chat,
     )
     insert_message(
         session_id=session_uuid,
         student_id=student_id,
         role="student",
         message_text=student_message_text,
+        origin="research" if payload.chat == RESEARCH_CHAT else "reactive",
     )
     log_stage(
         "Student Message Received",
@@ -164,13 +166,13 @@ def create_response(
     payload: StudentResponseRequest,
     request: Request,
 ) -> StudentResponseResponse:
-    # Replies made with research overrides are stored as origin='research' to keep
-    # them apart from what the production agent says.
+    # The research chat is kept apart from the student chat: its own history, and its
+    # rows stored as origin='research'. Overrides only ever come from the research chat.
     settings = DEFAULT_GENERATION_SETTINGS
-    origin = "reactive"
+    chat = RESEARCH_CHAT if payload.overrides is not None else payload.chat
+    origin = "research" if chat == RESEARCH_CHAT else "reactive"
     if payload.overrides is not None:
         settings = GenerationSettings(**payload.overrides.model_dump())
-        origin = "research"
     # Every LLM call made for this browser counts against its session's token budget
     # (services/budget.py). Refuse before doing any work once it's spent.
     budget_key = budget.budget_key(request.cookies.get(COOKIE_NAME))
@@ -265,6 +267,7 @@ def create_response(
                 student_message=payload.student_message,
                 events=events,
                 settings=settings,
+                chat=chat,
             )
             llm_request = result["llm_request"]
             log_stage(
@@ -319,6 +322,7 @@ def create_response(
         session_id=resolved_session_id,
         role="assistant",
         content=response_text,
+        chat=chat,
     )
     insert_message(
         session_id=session_uuid,

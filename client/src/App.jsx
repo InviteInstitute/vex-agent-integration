@@ -238,7 +238,9 @@ function App() {
   const [sessionId, setSessionId] = useState("Detecting latest session");
   const [startError, setStartError] = useState("");
   const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState(starterMessages);
+  // The student view and the research view are separate conversations. Each has its
+  // own message list here and its own history on the server (the `chat` field).
+  const [chats, setChats] = useState({ student: starterMessages, research: starterMessages });
   const [pendingAction, setPendingAction] = useState("");
   const [reviewDrafts, setReviewDrafts] = useState({});
   const [openReviews, setOpenReviews] = useState({});
@@ -268,6 +270,7 @@ function App() {
   const isStartModeRef = useRef(true);
   isStartModeRef.current = !studentId;
   const isResearchView = view === "research";
+  const messages = chats[view];
   // Overrides only ever leave this browser from the research view.
   const agentOverrides = isResearchView ? buildOverrides(agentSettings, researchConfig) : null;
   const showAgentTab = isResearchView && researchTab === "agent";
@@ -319,21 +322,24 @@ function App() {
         return;
       }
       const proactiveId = `proactive-${payload.message_id}`;
-      setMessages((current) =>
-        current.some((message) => message.id === proactiveId)
-          ? current
-          : [
-              ...current,
-              {
-                id: proactiveId,
-                role: "assistant",
-                body: payload.message,
-                proactive: true,
-                canFeedback: false,
-                trigger: payload.trigger_type,
-                triggerWhy: payload.trigger_why,
-              },
-            ],
+      const checkIn = {
+        id: proactiveId,
+        role: "assistant",
+        body: payload.message,
+        proactive: true,
+        canFeedback: false,
+        trigger: payload.trigger_type,
+        triggerWhy: payload.trigger_why,
+      };
+      // A check-in belongs to both chats: the student chat shows it as a student
+      // sees it, the research chat with its trigger.
+      setChats((current) =>
+        Object.fromEntries(
+          Object.entries(current).map(([chat, list]) => [
+            chat,
+            list.some((message) => message.id === proactiveId) ? list : [...list, checkIn],
+          ]),
+        ),
       );
     });
     return () => source.close();
@@ -536,8 +542,12 @@ function App() {
     };
   };
 
-  const appendMessage = (message) => {
-    setMessages((current) => [...current, message]);
+  const updateChat = (chat, updater) => {
+    setChats((current) => ({ ...current, [chat]: updater(current[chat]) }));
+  };
+
+  const appendMessage = (chat, message) => {
+    updateChat(chat, (current) => [...current, message]);
   };
 
   // The server's TurnstileGateMiddleware 403s any /v1/* call from a browser
@@ -599,8 +609,13 @@ function App() {
   };
 
   const updateMessage = (messageId, updater) => {
-    setMessages((current) =>
-      current.map((message) => (message.id === messageId ? updater(message) : message)),
+    setChats((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([chat, list]) => [
+          chat,
+          list.map((message) => (message.id === messageId ? updater(message) : message)),
+        ]),
+      ),
     );
   };
 
@@ -722,13 +737,17 @@ function App() {
     };
     const pendingAssistantMessage = createPendingAssistantMessage();
 
-    appendMessage(studentTurn);
-    appendMessage(pendingAssistantMessage);
+    // Pin the chat at send time, so a reply lands where it was asked even if the view
+    // is switched while it is on its way.
+    const chat = view;
+    appendMessage(chat, studentTurn);
+    appendMessage(chat, pendingAssistantMessage);
     setPendingAction(action);
 
     try {
       const messagePayload = {
         message,
+        chat,
         ...(sessionIdDraft.trim() ? { session_id: sessionIdDraft.trim() } : {}),
       };
       const messageResponse = await postJson(`/students/${studentId}/messages`, messagePayload);
@@ -737,13 +756,14 @@ function App() {
         message_id: messageResponse.message_id,
         session_id: messageResponse.session_id,
         student_message: studentMessage,
+        chat,
         ...(agentOverrides ? { overrides: agentOverrides } : {}),
       });
       setSessionId(responseRecord.session_id);
       if (responseRecord.session_tokens) {
         setSessionTokens(responseRecord.session_tokens);
       }
-      setMessages((current) =>
+      updateChat(chat, (current) =>
         current.map((entry) =>
           entry.id === studentTurn.id
             ? { ...entry, status: "sent" }
@@ -768,7 +788,7 @@ function App() {
       // 429: the message went through, but this session is out of LLM tokens. Say
       // that plainly instead of the generic fallback.
       const isOutOfTokens = error.status === 429;
-      setMessages((current) =>
+      updateChat(chat, (current) =>
         current.map((entry) =>
           entry.id === studentTurn.id
             ? isOutOfTokens

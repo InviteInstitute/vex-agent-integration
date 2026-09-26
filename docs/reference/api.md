@@ -92,7 +92,7 @@ Record an inbound student message (a typed question, or a help-button tap). This
 the message. The grounded reply comes from the `responses` endpoint.
 
 ```json title="Request"
-{ "session_id": null, "message": "why won't my robot turn?", "playground": null }
+{ "session_id": null, "message": "why won't my robot turn?", "playground": null, "chat": "student" }
 ```
 
 ```json title="Response"
@@ -107,7 +107,12 @@ the message. The grounded reply comes from the `responses` endpoint.
 }
 ```
 
-`source` is `chat` for typed messages or `help_button` for a tap.
+`source` is `chat` for typed messages or `help_button` for a tap. `chat` says which
+conversation the message belongs to: `student` (the default) or `research`, the research
+preview's separate chat. Each chat keeps its own recent turns, which are what the agent
+sees as "recent chat", and research-chat messages are stored with `origin = 'research'`.
+`responses` takes the same `chat` field; a request with `overrides` is always the
+research chat.
 
 ---
 

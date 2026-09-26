@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+Chat = Literal["student", "research"]
+
 
 class MessageRequest(BaseModel):
     session_id: str | None = Field(
@@ -9,6 +11,10 @@ class MessageRequest(BaseModel):
         description="Optional session identifier override for testing or replaying a known session.",
     )
     message: str = Field(default="", max_length=2000, description="Student message text.")
+    chat: Chat = Field(
+        default="student",
+        description="Which chat the message belongs to: the student view or the research view.",
+    )
     playground: str | None = Field(
         default=None,
         description="Task/playground identifier for the current activity, if already known.",
@@ -76,6 +82,10 @@ class StudentResponseRequest(BaseModel):
     overrides: ResearchOverrides | None = Field(
         default=None,
         description="Research-only agent settings from the research preview.",
+    )
+    chat: Chat = Field(
+        default="student",
+        description="Which chat the reply belongs to. Overrides always mean the research chat.",
     )
 
 

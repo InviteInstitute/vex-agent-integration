@@ -33,7 +33,7 @@ from vex_agent.domain.feedback_policy import FeedbackClass
 from vex_agent.domain.metrics import EventRecord
 from vex_agent.services.feedback import generate_feedback
 from vex_agent.services.identity import track_identity_switches
-from vex_agent.services.sessions import append_session_message
+from vex_agent.services.sessions import CHATS, append_session_message
 
 log = logging.getLogger(__name__)
 
@@ -345,13 +345,17 @@ def run_proactive_tick(student_id: str, session_id: str, playground: str | None 
             response_id=response_id,
             origin="proactive",
         )
-        append_session_message(
-            student_id=student_id,
-            playground=playground,
-            session_id=session_id,
-            role="assistant",
-            content=message_text,
-        )
+        # A check-in shows in both the student and the research chat, so it joins
+        # both chats' history.
+        for chat in CHATS:
+            append_session_message(
+                student_id=student_id,
+                playground=playground,
+                session_id=session_id,
+                role="assistant",
+                content=message_text,
+                chat=chat,
+            )
         mark_agent_trigger_acted(trigger_id=fire["id"], response_id=response_id)
         acted.append(
             {
