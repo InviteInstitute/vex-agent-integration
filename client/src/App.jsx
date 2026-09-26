@@ -7,7 +7,6 @@ const starterMessages = [
     id: "assistant-intro",
     role: "assistant",
     body: "Hi! I am your coding helper. Ask a question about your project, or tap 'Help' for assistance.",
-    meta: "Ready to help",
     canFeedback: false,
   },
 ];
@@ -105,41 +104,68 @@ export function renderMessageBody(text) {
   return elements;
 }
 
+const VIEW_STORAGE_KEY = "vex-agent:view";
+
+// Student view is what a student sees in class; research view adds the
+// telemetry behind each message (proactive trigger, model, session id).
+function readStoredView() {
+  try {
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === "research" ? "research" : "student";
+  } catch {
+    return "student";
+  }
+}
+
 function createPendingAssistantMessage() {
   return {
     id: crypto.randomUUID(),
     role: "assistant",
     body: "",
-    meta: "Thinking...",
     canFeedback: false,
     isLoading: true,
   };
 }
 
-function MessageAvatar({ role }) {
-  if (role === "student") {
-    return (
-      <div className="message-avatar message-avatar-student" aria-hidden="true">
-        <svg viewBox="0 0 48 48" className="message-avatar-svg">
-          <circle cx="24" cy="18" r="9" />
-          <path d="M10 40c2.8-7.4 9.1-11 14-11s11.2 3.6 14 11" />
-        </svg>
-      </div>
-    );
-  }
-
+function RobotIcon({ className }) {
   return (
-    <div className="message-avatar message-avatar-agent" aria-hidden="true">
-      <svg viewBox="0 0 48 48" className="message-avatar-svg">
-        <rect x="11" y="14" width="26" height="20" rx="6" />
-        <circle cx="19" cy="24" r="2.8" />
-        <circle cx="29" cy="24" r="2.8" />
-        <path d="M18 31h12" />
-        <path d="M24 8v6" />
-        <path d="M14 38v4" />
-        <path d="M34 38v4" />
-      </svg>
-    </div>
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+      <rect x="4.5" y="7.5" width="15" height="11" rx="3.5" />
+      <path d="M12 7.5V4.5" />
+      <circle cx="12" cy="3.6" r="0.9" />
+      <path d="M9.4 12.4v1.2M14.6 12.4v1.2" />
+      <path d="M2.5 12v2.5M21.5 12v2.5" />
+    </svg>
+  );
+}
+
+function Icon({ name }) {
+  const paths = {
+    chevronDown: <path d="m6 9 6 6 6-6" />,
+    send: <path d="M5 12h13m-5-6 6 6-6 6" />,
+    help: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7" />
+        <path d="M12 17.2v.1" />
+      </>
+    ),
+    thumbUp: (
+      <path d="M7.5 10.5v9h-3v-9h3Zm0 0 3.6-6.4a1.6 1.6 0 0 1 3 .9l-.6 4h4.8a2 2 0 0 1 2 2.4l-1.2 6a2 2 0 0 1-2 1.6H7.5" />
+    ),
+    thumbDown: (
+      <path d="M16.5 13.5v-9h3v9h-3Zm0 0-3.6 6.4a1.6 1.6 0 0 1-3-.9l.6-4H5.7a2 2 0 0 1-2-2.4l1.2-6a2 2 0 0 1 2-1.6h9.6" />
+    ),
+    alert: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7.5v5.5M12 16.4v.1" />
+      </>
+    ),
+  };
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
+      {paths[name]}
+    </svg>
   );
 }
 
@@ -209,11 +235,34 @@ function App() {
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isInteractingWithPanel, setIsInteractingWithPanel] = useState(false);
   const [hoveredResizeHandle, setHoveredResizeHandle] = useState(null);
+  const [view, setView] = useState(readStoredView);
+  const [seenMessageCount, setSeenMessageCount] = useState(0);
   const panelRef = useRef(null);
   const interactionRef = useRef(null);
   const messageListRef = useRef(null);
   const messagesEndRef = useRef(null);
   const apiBase = defaultApiBase;
+  const isResearchView = view === "research";
+  // The start card sizes to its content; only the chat itself is resizable.
+  const canResize = Boolean(studentId);
+
+  // Replies that land while the chat is collapsed, so the launcher can say so.
+  const unseenReplies = isChatOpen
+    ? 0
+    : messages
+        .slice(seenMessageCount)
+        .filter((message) => message.role === "assistant" && !message.isLoading).length;
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, view);
+    } catch {}
+  }, [view]);
+
+  const collapseChat = () => {
+    setSeenMessageCount(messages.length);
+    setIsChatOpen(false);
+  };
 
   // Proactive push lane: subscribe to the SSE stream and append messages the agent
   // pushes on its own (trigger-driven). The stream starts at the current head, so no
@@ -240,7 +289,7 @@ function App() {
                 id: proactiveId,
                 role: "assistant",
                 body: payload.message,
-                meta: "Proactive check-in",
+                proactive: true,
                 canFeedback: false,
                 trigger: payload.trigger_type,
                 triggerWhy: payload.trigger_why,
@@ -403,7 +452,7 @@ function App() {
   };
 
   const handlePanelPointerMove = (event) => {
-    if (interactionRef.current) {
+    if (interactionRef.current || !canResize) {
       return;
     }
     setHoveredResizeHandle(getResizeHandle(event.clientX, event.clientY, panelRect));
@@ -417,7 +466,7 @@ function App() {
   };
 
   const handlePanelPointerDownCapture = (event) => {
-    if (event.target.closest("button, textarea, input")) {
+    if (!canResize || event.target.closest("button, textarea, input")) {
       return;
     }
 
@@ -504,7 +553,7 @@ function App() {
       });
       updateMessage(responseId, (message) => ({
         ...message,
-        feedbackStatus: thumb === "up" ? "Thanks for the thumbs up." : "Thanks for the feedback.",
+        feedbackStatus: "Thanks!",
         selectedThumb: thumb,
       }));
     } catch (error) {
@@ -542,13 +591,13 @@ function App() {
       });
       updateMessage(responseId, (message) => ({
         ...message,
-        feedbackStatus: "Review sent.",
+        feedbackStatus: "Note sent.",
       }));
       setOpenReviews((current) => ({ ...current, [responseId]: false }));
     } catch (error) {
       updateMessage(responseId, (message) => ({
         ...message,
-        feedbackStatus: `Review failed: ${error.message}`,
+        feedbackStatus: `Note failed: ${error.message}`,
       }));
     } finally {
       setPendingFeedback((current) => {
@@ -600,30 +649,24 @@ function App() {
     event.currentTarget.form?.requestSubmit();
   };
 
-  const handleSend = async (event) => {
-    event.preventDefault();
-
-    const trimmedDraft = draft.trim();
-    if (!trimmedDraft) {
-      return;
-    }
-
-    const optimisticMessage = {
+  // Typed questions and the Help button share one round trip: log the
+  // student's turn, then ask the agent for a grounded reply.
+  const askAgent = async ({ shownText, message, studentMessage, action, fallbackBody }) => {
+    const studentTurn = {
       id: crypto.randomUUID(),
       role: "student",
-      body: trimmedDraft,
-      meta: "Sending",
+      body: shownText,
+      status: "sending",
     };
     const pendingAssistantMessage = createPendingAssistantMessage();
 
-    appendMessage(optimisticMessage);
+    appendMessage(studentTurn);
     appendMessage(pendingAssistantMessage);
-    setDraft("");
-    setPendingAction("message");
+    setPendingAction(action);
 
     try {
       const messagePayload = {
-        message: trimmedDraft,
+        message,
         ...(sessionIdDraft.trim() ? { session_id: sessionIdDraft.trim() } : {}),
       };
       const messageResponse = await postJson(`/students/${studentId}/messages`, messagePayload);
@@ -631,44 +674,37 @@ function App() {
       const responseRecord = await postJson(`/students/${studentId}/responses`, {
         message_id: messageResponse.message_id,
         session_id: messageResponse.session_id,
-        student_message: trimmedDraft,
+        student_message: studentMessage,
       });
       setSessionId(responseRecord.session_id);
-      setMessages((current) => [
-        ...current.map((message) =>
-          message.id === optimisticMessage.id
-            ? {
-                ...message,
-                meta: "Sent",
-              }
-            : message.id === pendingAssistantMessage.id
+      setMessages((current) =>
+        current.map((entry) =>
+          entry.id === studentTurn.id
+            ? { ...entry, status: "sent" }
+            : entry.id === pendingAssistantMessage.id
               ? {
                   id: responseRecord.response_id,
                   role: "assistant",
                   body: responseRecord.response_text,
-                  meta: responseRecord.llm_model || "Generated response",
+                  model: responseRecord.llm_model || null,
                   canFeedback: true,
-                  isLoading: false,
                 }
-              : message,
+              : entry,
         ),
-      ]);
+      );
     } catch (error) {
       setMessages((current) =>
-        current.map((message) =>
-          message.id === optimisticMessage.id
-            ? {
-                ...message,
-                meta: `Failed to send: ${error.message}`,
-              }
-            : message.id === pendingAssistantMessage.id
+        current.map((entry) =>
+          entry.id === studentTurn.id
+            ? { ...entry, status: "error", error: error.message }
+            : entry.id === pendingAssistantMessage.id
               ? {
-                  ...message,
-                  body: "The agent ran into a delay. Try asking again in a moment.",
-                  meta: `Failed: ${error.message}`,
+                  ...entry,
+                  body: fallbackBody,
+                  error: error.message,
                   isLoading: false,
                 }
-              : message,
+              : entry,
         ),
       );
     } finally {
@@ -676,72 +712,158 @@ function App() {
     }
   };
 
-  const handleHelp = async () => {
-    const helpMessage = {
-      id: crypto.randomUUID(),
-      role: "student",
-      body: "Help",
-      meta: "Sending",
-    };
-    const pendingAssistantMessage = createPendingAssistantMessage();
+  const handleSend = (event) => {
+    event.preventDefault();
 
-    appendMessage(helpMessage);
-    appendMessage(pendingAssistantMessage);
-    setPendingAction("help");
-
-    try {
-      const messagePayload = {
-        message: "",
-        ...(sessionIdDraft.trim() ? { session_id: sessionIdDraft.trim() } : {}),
-      };
-      const messageResponse = await postJson(`/students/${studentId}/messages`, messagePayload);
-      setSessionId(messageResponse.session_id);
-      const responseRecord = await postJson(`/students/${studentId}/responses`, {
-        message_id: messageResponse.message_id,
-        session_id: messageResponse.session_id,
-        student_message: "Help",
-      });
-      setSessionId(responseRecord.session_id);
-      setMessages((current) => [
-        ...current.map((message) =>
-          message.id === helpMessage.id
-            ? {
-                ...message,
-                meta: "Sent",
-              }
-            : message.id === pendingAssistantMessage.id
-              ? {
-                  id: responseRecord.response_id,
-                  role: "assistant",
-                  body: responseRecord.response_text,
-                  meta: responseRecord.llm_model || "Generated response",
-                  canFeedback: true,
-                  isLoading: false,
-                }
-              : message,
-        ),
-      ]);
-    } catch (error) {
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === helpMessage.id
-            ? {
-                ...message,
-                meta: `Failed to send: ${error.message}`,
-              }
-            : message.id === pendingAssistantMessage.id
-              ? {
-                  ...message,
-                  body: "Help could not be sent right now.",
-                  meta: `Failed to send: ${error.message}`,
-                  isLoading: false,
-                }
-              : message,
-        ),
-      );
-    } finally {
-      setPendingAction("");
+    const trimmedDraft = draft.trim();
+    if (!trimmedDraft) {
+      return;
     }
+
+    setDraft("");
+    askAgent({
+      shownText: trimmedDraft,
+      message: trimmedDraft,
+      studentMessage: trimmedDraft,
+      action: "message",
+      fallbackBody: "The agent ran into a delay. Try asking again in a moment.",
+    });
+  };
+
+  const handleHelp = () => {
+    askAgent({
+      shownText: "Help",
+      message: "",
+      studentMessage: "Help",
+      action: "help",
+      fallbackBody: "Help could not be sent right now.",
+    });
+  };
+
+  const isAgentBusy = pendingAction === "help" || pendingAction === "message";
+
+  const renderStudentStatus = (message) => {
+    if (message.status === "sending") {
+      return <span className="msg-status">Sending…</span>;
+    }
+    if (message.status === "error") {
+      return (
+        <span className="msg-status msg-status-error">
+          <Icon name="alert" />
+          {`Not sent: ${message.error}`}
+        </span>
+      );
+    }
+    return null;
+  };
+
+  const renderResearchDetails = (message) => {
+    if (!isResearchView) {
+      return null;
+    }
+    const rows = [];
+    if (message.proactive) {
+      rows.push(["Trigger", <code key="t">{message.trigger || "unknown"}</code>]);
+      if (message.triggerWhy) {
+        rows.push(["Why", message.triggerWhy]);
+      }
+    }
+    if (message.model) {
+      rows.push(["Model", <code key="m">{message.model}</code>]);
+    }
+    if (message.error) {
+      rows.push(["Error", message.error]);
+    }
+    if (!rows.length) {
+      return null;
+    }
+    return (
+      <dl className="research-details">
+        {rows.map(([term, detail]) => (
+          <div key={term}>
+            <dt>{term}</dt>
+            <dd>{detail}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  };
+
+  const renderFeedback = (message) => {
+    const pending = pendingFeedback[message.id];
+    const isNoteOpen = Boolean(openReviews[message.id]);
+    return (
+      <div className="feedback">
+        <div className="feedback-row">
+          {[
+            ["up", "thumbUp", "This helped"],
+            ["down", "thumbDown", "This didn't help"],
+          ].map(([thumb, icon, label]) => (
+            <button
+              key={thumb}
+              type="button"
+              className="feedback-thumb"
+              aria-pressed={message.selectedThumb === thumb}
+              onClick={() => handleFeedback(message.id, thumb)}
+              disabled={Boolean(pending)}
+              aria-label={label}
+              title={label}
+            >
+              {pending === thumb ? (
+                <span className="spinner" aria-hidden="true" />
+              ) : (
+                <Icon name={icon} />
+              )}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="feedback-note-toggle"
+            aria-expanded={isNoteOpen}
+            onClick={() =>
+              setOpenReviews((current) => ({
+                ...current,
+                [message.id]: !current[message.id],
+              }))
+            }
+          >
+            {isNoteOpen ? "Hide note" : "Add a note"}
+          </button>
+          {message.feedbackStatus ? (
+            <span className="feedback-status" role="status">
+              {message.feedbackStatus}
+            </span>
+          ) : null}
+        </div>
+        {isNoteOpen ? (
+          <div className="feedback-note">
+            <label className="sr-only" htmlFor={`note-${message.id}`}>
+              Note about this reply
+            </label>
+            <textarea
+              id={`note-${message.id}`}
+              rows="2"
+              value={reviewDrafts[message.id] || ""}
+              onChange={(event) =>
+                setReviewDrafts((current) => ({
+                  ...current,
+                  [message.id]: event.target.value,
+                }))
+              }
+              placeholder="What helped, or what was confusing?"
+            />
+            <button
+              type="button"
+              className="button-small"
+              onClick={() => handleReviewSubmit(message.id)}
+              disabled={Boolean(pending)}
+            >
+              {pending === "review" ? "Sending…" : "Send note"}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
   };
 
   return (
@@ -755,7 +877,10 @@ function App() {
       {isChatOpen ? (
         <section
           ref={panelRef}
-          className={`chat-overlay ${!studentId ? "chat-overlay-start" : ""}`}
+          className={`chat-overlay ${!studentId ? "chat-overlay-start" : ""} ${
+            isInteractingWithPanel ? "is-moving" : ""
+          }`}
+          aria-label="Guide Bot chat"
           onPointerDownCapture={handlePanelPointerDownCapture}
           onPointerMove={handlePanelPointerMove}
           onPointerLeave={handlePanelPointerLeave}
@@ -763,246 +888,200 @@ function App() {
             left: `${panelRect.x}px`,
             top: `${panelRect.y}px`,
             width: `${panelRect.width}px`,
-            height: `${panelRect.height}px`,
+            height: canResize ? `${panelRect.height}px` : undefined,
             cursor: getCursorForResizeHandle(hoveredResizeHandle),
           }}
         >
-          {studentId ? (
-            <header className="toolbar draggable-toolbar" onPointerDown={startDrag}>
-              <div className="toolbar-copy">
-                <h1>Chat</h1>
-                <p>{`${studentId} · GO-Mars · ${sessionId}`}</p>
-              </div>
-              <div className="toolbar-actions">
+          <header className="panel-header" onPointerDown={startDrag}>
+            <span className="panel-mark" aria-hidden="true">
+              <RobotIcon className="robot-icon" />
+            </span>
+            <div className="panel-title">
+              <h1>Guide Bot</h1>
+              {studentId ? (
+                <p>
+                  <span>{studentId}</span>
+                  <span className="panel-title-sep" aria-hidden="true" />
+                  <span>GO-Mars</span>
+                  {isResearchView ? (
+                    <>
+                      <span className="panel-title-sep" aria-hidden="true" />
+                      <span className="panel-session" title={sessionId}>
+                        {sessionId}
+                      </span>
+                    </>
+                  ) : null}
+                </p>
+              ) : (
+                <p>Your VEXcode VR coding helper</p>
+              )}
+            </div>
+            <div className="panel-actions">
+              {studentId ? (
                 <button
                   type="button"
                   className="help-button"
                   onClick={handleHelp}
-                  disabled={pendingAction === "help" || pendingAction === "message"}
+                  disabled={isAgentBusy}
                 >
-                  {pendingAction === "help" ? "Sending..." : "Help"}
+                  <Icon name="help" />
+                  {pendingAction === "help" ? "Asking…" : "Help"}
                 </button>
-                <button
-                  type="button"
-                  className="chat-close-button"
-                  onClick={() => setIsChatOpen(false)}
-                  aria-label="Collapse chat"
-                  title="Collapse chat"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true" className="chat-close-icon">
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                  <span className="chat-close-text">Collapse</span>
-                </button>
-              </div>
-            </header>
-          ) : null}
-          {!studentId ? (
-            <button
-              type="button"
-              className="chat-close-button chat-close-button-floating"
-              onClick={() => setIsChatOpen(false)}
-              aria-label="Collapse chat"
-              title="Collapse chat"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true" className="chat-close-icon">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-              <span className="chat-close-text">Collapse</span>
-            </button>
-          ) : null}
+              ) : null}
+              <button
+                type="button"
+                className="panel-icon-button"
+                onClick={collapseChat}
+                aria-label="Collapse chat"
+                title="Collapse chat"
+              >
+                <Icon name="chevronDown" />
+              </button>
+            </div>
+          </header>
 
-          <div className="workspace workspace-overlay">
-            {!studentId ? (
-              <div className="start-drag-surface" onPointerDown={startDrag}>
-                <section
-                  className="start-card start-card-inline"
-                  onPointerDown={(event) => event.stopPropagation()}
+          {!studentId ? (
+            <div className="start">
+              <h2>Start Chat</h2>
+              <p>Enter your student ID to begin.</p>
+              <form className="start-form" onSubmit={handleStudentStart}>
+                <label htmlFor="student-id">Student ID</label>
+                <input
+                  id="student-id"
+                  type="text"
+                  value={studentIdDraft}
+                  onChange={(event) => setStudentIdDraft(event.target.value)}
+                  placeholder="e.g. mars-042"
+                  autoComplete="off"
+                  spellCheck="false"
+                  disabled={pendingAction === "session"}
+                  aria-invalid={Boolean(startError)}
+                  aria-describedby={startError ? "start-error" : undefined}
+                />
+                <button
+                  type="submit"
+                  className="button-primary"
+                  disabled={pendingAction === "session" || !studentIdDraft.trim()}
                 >
-                  <h2>Start Chat</h2>
-                  <p>Enter your student ID to begin.</p>
-                  <form className="start-form" onSubmit={handleStudentStart}>
-                    <label className="sr-only" htmlFor="student-id">
-                      Student ID
-                    </label>
-                    <input
-                      id="student-id"
-                      type="text"
-                      value={studentIdDraft}
-                      onChange={(event) => setStudentIdDraft(event.target.value)}
-                      placeholder="Student ID"
-                      autoComplete="off"
-                      disabled={pendingAction === "session"}
-                    />
-                    <button type="submit" disabled={pendingAction === "session"}>
-                      {pendingAction === "session" ? "Loading..." : "Start Chat"}
-                    </button>
-                  </form>
-                  {startError ? <p className="start-error">{startError}</p> : null}
-                </section>
-              </div>
-            ) : (
+                  {pendingAction === "session" ? "Finding your session…" : "Start Chat"}
+                </button>
+              </form>
+              {startError ? (
+                <p className="start-error" id="start-error" role="alert">
+                  <Icon name="alert" />
+                  {startError}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <>
               <section className="message-list" aria-label="Conversation" ref={messageListRef}>
-                {messages.map((message) => (
-                  <article
-                    key={message.id}
-                    className={`message-row ${message.role === "student" ? "outgoing" : "incoming"}`}
-                  >
-                    <MessageAvatar role={message.role} />
-                    <div className="message-card">
-                      <div className="message-bubble">
-                        <div className="message-label">
-                          {message.role === "student" ? "You" : "Guide Bot"}
+                {messages.map((message) =>
+                  message.role === "student" ? (
+                    <article key={message.id} className="msg msg-student">
+                      <span className="sr-only">You said: </span>
+                      <div className="bubble">{renderMessageBody(message.body)}</div>
+                      {renderStudentStatus(message)}
+                    </article>
+                  ) : (
+                    <article
+                      key={message.id}
+                      className={`msg msg-agent ${message.proactive ? "msg-checkin" : ""}`}
+                    >
+                      <span className="msg-avatar" aria-hidden="true">
+                        <RobotIcon className="robot-icon" />
+                      </span>
+                      <div className="msg-main">
+                        <div className="msg-author">
+                          Guide Bot
+                          {message.proactive ? (
+                            <span className="checkin-tag">
+                              {isResearchView ? "Proactive check-in" : "Checking in"}
+                            </span>
+                          ) : null}
                         </div>
-                        <div className="message-body-wrap">
+                        <div className={`bubble ${message.error ? "bubble-error" : ""}`}>
                           {message.isLoading ? (
-                            <div className="thinking-indicator" aria-label="Agent is thinking">
-                              <span className="thinking-text">Guide Bot is thinking</span>
-                              <span className="thinking-dots" aria-hidden="true">
-                                <span />
-                                <span />
-                                <span />
-                              </span>
-                            </div>
+                            <span className="thinking" role="status">
+                              <span className="sr-only">Guide Bot is thinking</span>
+                              <span aria-hidden="true" />
+                              <span aria-hidden="true" />
+                              <span aria-hidden="true" />
+                            </span>
                           ) : (
                             renderMessageBody(message.body)
                           )}
+                          {renderResearchDetails(message)}
                         </div>
-                        <span className="message-meta">{message.meta}</span>
-                        {message.trigger ? (
-                          <span
-                            className="trigger-badge"
-                            title="The behavior that triggered this proactive message"
-                            style={{
-                              display: "inline-block",
-                              marginTop: "4px",
-                              padding: "2px 8px",
-                              borderRadius: "999px",
-                              fontSize: "11px",
-                              fontWeight: 600,
-                              background: "rgba(124, 58, 237, 0.12)",
-                              color: "#7c3aed",
-                            }}
-                          >
-                            ⚡ {message.trigger}
-                            {message.triggerWhy ? ` · ${message.triggerWhy}` : ""}
-                          </span>
-                        ) : null}
-                        {message.role === "assistant" && message.canFeedback ? (
-                          <div className="feedback-panel">
-                            <div className="feedback-actions">
-                              <button
-                                type="button"
-                                className={`icon-button ${message.selectedThumb === "up" ? "selected" : ""}`}
-                                onClick={() => handleFeedback(message.id, "up")}
-                                disabled={Boolean(pendingFeedback[message.id])}
-                                aria-label="Thumbs up"
-                                title="Thumbs up"
-                              >
-                                {pendingFeedback[message.id] === "up" ? (
-                                  "..."
-                                ) : (
-                                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M10 21H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h4v11Zm2-11 2.6-6.1A1.5 1.5 0 0 1 16 3a2 2 0 0 1 2 2v4h2.7a2 2 0 0 1 2 2.4l-1.2 6A2 2 0 0 1 19.5 19H12V10Z" />
-                                  </svg>
-                                )}
-                              </button>
-                              <button
-                                type="button"
-                                className={`icon-button ${message.selectedThumb === "down" ? "selected" : ""}`}
-                                onClick={() => handleFeedback(message.id, "down")}
-                                disabled={Boolean(pendingFeedback[message.id])}
-                                aria-label="Thumbs down"
-                                title="Thumbs down"
-                              >
-                                {pendingFeedback[message.id] === "down" ? (
-                                  "..."
-                                ) : (
-                                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M14 3h4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-4V3Zm-2 11-2.6 6.1A1.5 1.5 0 0 1 8 21a2 2 0 0 1-2-2v-4H3.3a2 2 0 0 1-2-2.4l1.2-6A2 2 0 0 1 4.5 5H12v9Z" />
-                                  </svg>
-                                )}
-                              </button>
-                              <button
-                                type="button"
-                                className="review-toggle"
-                                onClick={() =>
-                                  setOpenReviews((current) => ({
-                                    ...current,
-                                    [message.id]: !current[message.id],
-                                  }))
-                                }
-                              >
-                                {openReviews[message.id] ? "Hide Review" : "Add Review"}
-                              </button>
-                            </div>
-                            {openReviews[message.id] ? (
-                              <div className="review-form">
-                                <textarea
-                                  rows="2"
-                                  value={reviewDrafts[message.id] || ""}
-                                  onChange={(event) =>
-                                    setReviewDrafts((current) => ({
-                                      ...current,
-                                      [message.id]: event.target.value,
-                                    }))
-                                  }
-                                  placeholder="Write a review if you want."
-                                />
-                                <button
-                                  type="button"
-                                  className="send-review"
-                                  onClick={() => handleReviewSubmit(message.id)}
-                                  disabled={Boolean(pendingFeedback[message.id])}
-                                >
-                                  {pendingFeedback[message.id] === "review"
-                                    ? "Sending..."
-                                    : "Send Review"}
-                                </button>
-                              </div>
-                            ) : null}
-                            {message.feedbackStatus ? (
-                              <div className="feedback-status">{message.feedbackStatus}</div>
-                            ) : null}
-                          </div>
-                        ) : null}
+                        {message.canFeedback ? renderFeedback(message) : null}
                       </div>
-                    </div>
-                  </article>
-                ))}
+                    </article>
+                  ),
+                )}
                 <div ref={messagesEndRef} aria-hidden="true" />
               </section>
-            )}
-          </div>
 
-          {studentId ? (
-            <form className="composer" onSubmit={handleSend}>
-              <label className="sr-only" htmlFor="student-message">
-                Message
-              </label>
-              <textarea
-                id="student-message"
-                rows="3"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-                placeholder="Ask about your program, your bug, or what to try next."
-              />
-              <div className="composer-footer">
-                <button type="submit" disabled={pendingAction === "message" || !draft.trim()}>
-                  {pendingAction === "message" ? "Sending..." : "Send"}
-                </button>
-              </div>
-            </form>
-          ) : null}
+              <form className="composer" onSubmit={handleSend}>
+                <div className="composer-field">
+                  <label className="sr-only" htmlFor="student-message">
+                    Message
+                  </label>
+                  <textarea
+                    id="student-message"
+                    rows="2"
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={handleComposerKeyDown}
+                    placeholder="Ask about your program, your bug, or what to try next."
+                  />
+                  <button
+                    type="submit"
+                    className="send-button"
+                    disabled={pendingAction === "message" || !draft.trim()}
+                  >
+                    {pendingAction === "message" ? "Sending…" : "Send"}
+                    <Icon name="send" />
+                  </button>
+                </div>
+                <div className="composer-foot">
+                  <div className="view-toggle" role="group" aria-label="View">
+                    {[
+                      ["student", "Student"],
+                      ["research", "Research"],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={view === value}
+                        onClick={() => setView(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="composer-hint">
+                    <kbd>Enter</kbd> to send, <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line
+                  </span>
+                </div>
+              </form>
+              <span className="resize-grip" aria-hidden="true" />
+            </>
+          )}
         </section>
-      ) : null}
-
-      {!isChatOpen ? (
+      ) : (
         <button type="button" className="chat-launcher" onClick={() => setIsChatOpen(true)}>
+          <span className="panel-mark" aria-hidden="true">
+            <RobotIcon className="robot-icon" />
+          </span>
           Open Chat
+          {unseenReplies ? (
+            <span className="launcher-badge">
+              {unseenReplies} new
+              <span className="sr-only"> {unseenReplies === 1 ? "reply" : "replies"}</span>
+            </span>
+          ) : null}
         </button>
-      ) : null}
+      )}
     </main>
   );
 }
