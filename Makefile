@@ -48,6 +48,7 @@ format-check: ## Check formatting without writing changes
 build: ## Build the client into client/dist (nginx serves this in prod)
 	npm --prefix client run build
 
-deploy: ## Prod deploy: roll the stack + migrations, then rebuild the client
+deploy: ## Prod deploy: roll the stack + migrations, then reinstall + rebuild the client
 	./scripts/deploy.sh
+	npm --prefix client ci
 	npm --prefix client run build

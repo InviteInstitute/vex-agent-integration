@@ -744,7 +744,7 @@ button:disabled {
 
 .chat-launcher {
   position: absolute;
-  left: 24px;
+  right: 24px;
   bottom: 24px;
   z-index: 3;
   height: 2.75rem;
@@ -844,7 +844,7 @@ button:disabled {
   }
 
   .chat-launcher {
-    left: 12px;
+    right: 12px;
     bottom: 12px;
   }
 

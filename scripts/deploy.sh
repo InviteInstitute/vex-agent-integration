@@ -11,8 +11,8 @@
 # TRIGGER_DAEMON_ENABLED), so there is no separate daemon service to roll.
 #
 # The client is a static Vite build served by nginx from client/dist, not by the
-# api. This script does not rebuild it; run `npm --prefix client run build` when
-# the frontend changes.
+# api. This script does not rebuild it; `make deploy` runs `npm --prefix client ci`
+# and `npm --prefix client run build` after it.
 #
 # Prereqs on this host: Docker + the compose v2 plugin, and a `.env` with
 # POSTGRES_PASSWORD and the app secrets (see .env.example).
