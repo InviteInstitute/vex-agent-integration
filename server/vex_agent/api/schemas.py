@@ -44,9 +44,9 @@ class ResearchOverrides(BaseModel):
     )
     temperature: float | None = Field(default=None, ge=0, le=2)
     max_tokens: int | None = Field(default=None, ge=16, le=4096)
-    trim_to_one_sentence: bool = Field(
+    trim_reply: bool = Field(
         default=True,
-        description="Trim the reply to one short sentence, as students get it.",
+        description="Trim the reply to bite size (enforce_student_response_length), as students get it.",
     )
 
 
@@ -108,7 +108,7 @@ class FeedbackResponse(BaseModel):
 class ResearchDefaults(BaseModel):
     model: str
     max_tokens: int
-    trim_to_one_sentence: bool
+    trim_reply: bool
 
 
 class ResearchConfigResponse(BaseModel):

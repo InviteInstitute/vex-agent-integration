@@ -36,7 +36,7 @@ cp .env.example .env
 ## Trying Other Models And Prompts
 
 The research preview lets a researcher try any model the gateway serves, edit the prompt
-template, and change temperature, max tokens, and the one-sentence trim, without touching
+template, and change temperature, max tokens, and the reply trim, without touching
 what students get.
 
 1. Set `RESEARCH_KEY` in `.env` to a long random value and redeploy.

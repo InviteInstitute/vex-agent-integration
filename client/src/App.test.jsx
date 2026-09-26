@@ -18,6 +18,12 @@ describe("renderMessageBody", () => {
     expect(screen.getByText("drive").tagName).toBe("CODE");
   });
 
+  it("renders *emphasis* without touching a lone asterisk", () => {
+    render(<div>{renderMessageBody("Add a *second* block, then try 2 * 3.")}</div>);
+    expect(screen.getByText("second").tagName).toBe("EM");
+    expect(screen.getByText(/then try 2 \* 3\./)).toBeInTheDocument();
+  });
+
   it("renders a bulleted list as <li> items", () => {
     render(<div>{renderMessageBody("- first\n- second")}</div>);
     const items = screen.getAllByRole("listitem");

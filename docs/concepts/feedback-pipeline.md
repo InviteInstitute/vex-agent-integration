@@ -17,7 +17,7 @@ flowchart LR
     b --> c["Build situation<br/>model"]
     c --> d["Build current<br/>program"]
     d --> e["One LLM pass"]
-    e --> f["Sanitize to<br/>one sentence"]
+    e --> f["Sanitize and<br/>trim"]
 ```
 
 1. **Resolve the task and blocks.** Given the playground the student is in, look up the
@@ -34,9 +34,16 @@ flowchart LR
    the source of early hallucinations.
 5. **Run one LLM pass.** Hand the model the task, the available blocks, the current
    program, the situation model, the recent chat, and the feedback classes, and get back
-   one short reply (`llm/client.py`).
-6. **Sanitize.** Trim to a single sentence and strip the label and quote leaks that small
-   local models tend to emit (`llm/sanitizer.py`).
+   one short reply (`llm/client.py`). Some models reason before they answer and spend
+   the whole answer budget doing it (an empty reply, a cut-off one, or reasoning left in
+   the text). When that happens the call is retried once with `reasoning_effort: low` and
+   a separate reasoning budget, and the model is remembered so later calls ask that way
+   first. Models that answer directly never see the retry.
+6. **Sanitize and trim.** Strip reasoning blocks and the label and quote leaks that small
+   local models tend to emit (`llm/sanitizer.py`), then trim to bite size: the first
+   sentence, plus a second when both fit 22 words, so "Nice start! Try X." keeps its
+   hint. A single sentence up to 30 words stays whole; a longer one is cut at a clause
+   break rather than mid-phrase.
 
 ## One Model Call, Grounded On Facts
 
