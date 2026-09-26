@@ -51,6 +51,7 @@ describe("buildOverrides", () => {
 
 describe("Agent tab", () => {
   let fetchMock;
+  let responsesReply;
 
   beforeEach(() => {
     window.localStorage.clear();
@@ -63,25 +64,29 @@ describe("Agent tab", () => {
         close() {}
       },
     );
-    fetchMock = vi.fn((url, options = {}) => {
+    responsesReply = {
+      status: 200,
+      body: {
+        response_id: "r1",
+        session_id: "session-1",
+        response_text: "Try a longer drive.",
+        llm_model: "glm-5.3",
+        llm_prompt: "You are an agent. Task: Rescue the rover",
+        llm_tokens: 1830,
+        session_tokens: { used: 3830, limit: 150000 },
+      },
+    };
+    fetchMock = vi.fn((url) => {
       const json = (body, status = 200) =>
         Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(body) });
       if (url.endsWith("/research/config")) {
-        return options.headers?.["X-Research-Key"] === "right-key"
-          ? json(CONFIG)
-          : json({ detail: "Research key is missing or wrong." }, 403);
+        return json({ ...CONFIG, session_tokens: { used: 2000, limit: 150000 } });
       }
       if (url.endsWith("/messages")) {
         return json({ message_id: "m1", session_id: "session-1" });
       }
       if (url.endsWith("/responses")) {
-        return json({
-          response_id: "r1",
-          session_id: "session-1",
-          response_text: "Try a longer drive.",
-          llm_model: "glm-5.3",
-          llm_prompt: "You are an agent. Task: Rescue the rover",
-        });
+        return json(responsesReply.body, responsesReply.status);
       }
       return json({ session_id: "session-1" });
     });
@@ -92,22 +97,20 @@ describe("Agent tab", () => {
     vi.unstubAllGlobals();
   });
 
-  it("unlocks with the research key and sends the chosen model as an override", async () => {
-    const user = userEvent.setup();
+  async function startChat(user) {
     render(<App />);
     await user.type(screen.getByLabelText("Student ID"), "mars-042");
     await user.click(screen.getByRole("button", { name: "Start chat" }));
+  }
+
+  it("needs no key, sends the chosen model, and tracks the session's tokens", async () => {
+    const user = userEvent.setup();
+    await startChat(user);
 
     await user.click(await screen.findByRole("tab", { name: "Agent" }));
-    await user.type(screen.getByLabelText("Research key"), "wrong-key");
-    await user.click(screen.getByRole("button", { name: "Unlock" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Research key is missing or wrong.");
-
-    await user.clear(screen.getByLabelText("Research key"));
-    await user.type(screen.getByLabelText("Research key"), "right-key");
-    await user.click(screen.getByRole("button", { name: "Unlock" }));
     await user.selectOptions(await screen.findByLabelText("Model"), "glm-5.3");
     expect(screen.getByRole("status")).toHaveTextContent("Custom settings are on");
+    expect(screen.getByText("2,000 of 150,000 LLM tokens used this session.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Chat" }));
     expect(screen.getByText(/Custom agent: glm-5\.3/)).toBeInTheDocument();
@@ -115,29 +118,47 @@ describe("Agent tab", () => {
     await user.click(screen.getByRole("button", { name: /Send/ }));
 
     const [, options] = fetchMock.mock.calls.find(([url]) => url.endsWith("/responses"));
-    expect(options.headers["X-Research-Key"]).toBe("right-key");
     expect(JSON.parse(options.body).overrides).toEqual({ model: "glm-5.3" });
 
     const conversation = screen.getByRole("region", { name: "Conversation" });
     expect(await within(conversation).findByText("Try a longer drive.")).toBeInTheDocument();
+    expect(within(conversation).getByText("1,830")).toBeInTheDocument();
     expect(within(conversation).getByText("Prompt sent to the model")).toBeInTheDocument();
-    expect(window.localStorage.getItem("vex-agent:research-key")).toBe(JSON.stringify("right-key"));
+
+    await user.click(screen.getByRole("tab", { name: "Agent" }));
+    expect(screen.getByText("3,830 of 150,000 LLM tokens used this session.")).toBeInTheDocument();
   });
 
-  it("sends no overrides or key from the student view", async () => {
+  it("says plainly when the session is out of tokens", async () => {
+    responsesReply = {
+      status: 429,
+      body: {
+        detail:
+          "This session has used its 150,000 LLM tokens. Start a new session later to keep going.",
+      },
+    };
+    const user = userEvent.setup();
+    await startChat(user);
+    await user.type(await screen.findByLabelText("Message"), "hi");
+    await user.click(screen.getByRole("button", { name: /Send/ }));
+
+    const conversation = screen.getByRole("region", { name: "Conversation" });
+    expect(
+      await within(conversation).findByText(/This session has used its 150,000 LLM tokens\./),
+    ).toBeInTheDocument();
+    expect(within(conversation).queryByText(/Not sent/)).not.toBeInTheDocument();
+  });
+
+  it("sends no overrides from the student view", async () => {
     window.localStorage.setItem("vex-agent:view", "student");
-    window.localStorage.setItem("vex-agent:research-key", JSON.stringify("right-key"));
     window.localStorage.setItem("vex-agent:agent-settings", JSON.stringify({ model: "glm-5.3" }));
     const user = userEvent.setup();
-    render(<App />);
-    await user.type(screen.getByLabelText("Student ID"), "mars-042");
-    await user.click(screen.getByRole("button", { name: "Start chat" }));
+    await startChat(user);
     await user.type(await screen.findByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: /Send/ }));
 
     expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
     const [, options] = fetchMock.mock.calls.find(([url]) => url.endsWith("/responses"));
-    expect(options.headers["X-Research-Key"]).toBeUndefined();
     expect(JSON.parse(options.body).overrides).toBeUndefined();
   });
 });

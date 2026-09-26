@@ -156,7 +156,12 @@ def list_available_models() -> list[str]:
 
 
 class EmptyAnswerError(RuntimeError):
-    """The model spent its whole budget without producing a usable answer."""
+    """The model spent its whole budget without producing a usable answer. Carries the
+    tokens it spent, which still count against the caller's budget."""
+
+    def __init__(self, message: str, tokens: int = 0):
+        super().__init__(message)
+        self.tokens = tokens
 
 
 def _request_answer(
@@ -166,9 +171,10 @@ def _request_answer(
     max_tokens: int | None,
     temperature: float | None,
     allow_reasoning: bool,
-) -> tuple[str, str]:
-    """One chat completion. Returns (answer, finish_reason), where the answer has any
-    reasoning block stripped.
+) -> tuple[str, str, int]:
+    """One chat completion. Returns (answer, finish_reason, tokens), where the answer
+    has any reasoning block stripped and tokens is what the call spent, prompt plus
+    completion (estimated at ~4 characters a token if the gateway reports no usage).
 
     The default shape is what production has always sent: the answer budget, and
     Qwen's enable_thinking=false. With allow_reasoning the model may think first:
@@ -195,8 +201,11 @@ def _request_answer(
         **kwargs,
     )
     choice = response.choices[0]
-    answer = strip_thinking(choice.message.content or "").strip()
-    return answer, getattr(choice, "finish_reason", None) or "stop"
+    content = choice.message.content or ""
+    usage = getattr(response, "usage", None)
+    tokens = getattr(usage, "total_tokens", None) or (len(prompt) + len(content)) // 4
+    answer = strip_thinking(content).strip()
+    return answer, getattr(choice, "finish_reason", None) or "stop", tokens
 
 
 def execute_prompt(
@@ -205,41 +214,47 @@ def execute_prompt(
     prompt: str,
     max_tokens: int | None = None,
     temperature: float | None = None,
+    usage: list[int] | None = None,
 ) -> str:
     """Ask `model` for a reply, adapting to models that reason before answering.
+    Pass a list as `usage` to have the tokens each request spent appended to it.
 
     A short feedback reply never legitimately runs out of budget, so an empty answer
     or finish_reason="length" means the model spent the budget reasoning (as a
     separate field, inside <think>, or as plain text). Then retry once with room to
     reason, and remember the model so later calls ask that way first. Models that
     answer directly (production's qwen3.8-27b among them) never see the retry."""
+    spent = usage if usage is not None else []
     allow_reasoning = model in _reasoning_models
-    answer, finish_reason = _request_answer(
+    answer, finish_reason, tokens = _request_answer(
         model=model,
         prompt=prompt,
         max_tokens=max_tokens,
         temperature=temperature,
         allow_reasoning=allow_reasoning,
     )
+    spent.append(tokens)
     if (not answer or finish_reason == "length") and not allow_reasoning:
         logger.info(
             "%s gave no usable answer (finish_reason=%s); retrying with room to reason",
             model,
             finish_reason,
         )
-        answer, finish_reason = _request_answer(
+        answer, finish_reason, tokens = _request_answer(
             model=model,
             prompt=prompt,
             max_tokens=max_tokens,
             temperature=temperature,
             allow_reasoning=True,
         )
+        spent.append(tokens)
         if answer:
             _reasoning_models.add(model)
     if not answer:
         raise EmptyAnswerError(
             f"{model} returned no answer (finish_reason={finish_reason}). "
-            "It may need more max tokens or a different prompt."
+            "It may need more max tokens or a different prompt.",
+            tokens=sum(spent),
         )
     return answer
 
@@ -310,11 +325,13 @@ def generate_main_llm_response(
         feedback_classes=feedback_classes,
         settings=settings,
     )
+    usage: list[int] = []
     response_text = execute_prompt(
         model=llm_request["model"],
         prompt=llm_request["prompt"],
         max_tokens=settings.max_tokens or MAIN_RESPONSE_MAX_TOKENS,
         temperature=settings.temperature,
+        usage=usage,
     )
     response_text = sanitize_llm_output(response_text)
     if settings.trim_reply:
@@ -323,4 +340,5 @@ def generate_main_llm_response(
         "model": llm_request["model"],
         "prompt": llm_request["prompt"],
         "response_text": response_text,
+        "tokens": sum(usage),
     }

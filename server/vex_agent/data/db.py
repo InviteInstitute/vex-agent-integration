@@ -531,3 +531,39 @@ def upsert_snapshot(snapshot: CurrentStateSnapshot) -> None:
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, payload)
+
+
+def record_llm_usage(
+    *, budget_key: str, student_id: str | None, model: str, origin: str, tokens: int
+) -> None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO chat.llm_usage (budget_key, student_id, model, origin, tokens)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (budget_key, student_id, model, origin, tokens),
+            )
+
+
+def get_llm_tokens_for_budget_key(budget_key: str) -> int:
+    """Tokens spent by one browser session (its Turnstile cookie lives 12h)."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(SUM(tokens), 0) FROM chat.llm_usage WHERE budget_key = %s",
+                (budget_key,),
+            )
+            return int(cur.fetchone()[0])
+
+
+def get_llm_tokens_last_day() -> int:
+    """Tokens spent by every browser session in the last 24 hours."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(SUM(tokens), 0) FROM chat.llm_usage "
+                "WHERE created_at > NOW() - INTERVAL '1 day'"
+            )
+            return int(cur.fetchone()[0])
