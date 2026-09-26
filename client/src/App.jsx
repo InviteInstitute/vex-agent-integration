@@ -122,7 +122,6 @@ export function renderMessageBody(text) {
 }
 
 const VIEW_STORAGE_KEY = "vex-agent:view";
-const RESEARCH_KEY_STORAGE_KEY = "vex-agent:research-key";
 const AGENT_SETTINGS_STORAGE_KEY = "vex-agent:agent-settings";
 
 function readStored(key, fallback) {
@@ -250,10 +249,11 @@ function App() {
   const [hoveredResizeHandle, setHoveredResizeHandle] = useState(null);
   const [view, setView] = useState(readStoredView);
   const [researchTab, setResearchTab] = useState("chat");
-  const [researchKey, setResearchKey] = useState(() => readStored(RESEARCH_KEY_STORAGE_KEY, null));
   const [researchConfig, setResearchConfig] = useState(null);
-  const [isUnlocking, setIsUnlocking] = useState(false);
-  const [unlockError, setUnlockError] = useState("");
+  const [isLoadingConfig, setIsLoadingConfig] = useState(false);
+  const [configError, setConfigError] = useState("");
+  // This browser session's LLM token budget, as the server last reported it.
+  const [sessionTokens, setSessionTokens] = useState(null);
   const [agentSettings, setAgentSettings] = useState(() => ({
     ...EMPTY_AGENT_SETTINGS,
     ...readStored(AGENT_SETTINGS_STORAGE_KEY, {}),
@@ -268,9 +268,8 @@ function App() {
   const isStartModeRef = useRef(true);
   isStartModeRef.current = !studentId;
   const isResearchView = view === "research";
-  // Overrides only ever leave this browser in research view with a checked key.
-  const agentOverrides =
-    isResearchView && researchKey ? buildOverrides(agentSettings, researchConfig) : null;
+  // Overrides only ever leave this browser from the research view.
+  const agentOverrides = isResearchView ? buildOverrides(agentSettings, researchConfig) : null;
   const showAgentTab = isResearchView && researchTab === "agent";
   // The start card sizes to its content; only the chat itself is resizable.
   const canResize = Boolean(studentId);
@@ -293,11 +292,11 @@ function App() {
   }, [agentSettings]);
 
   useEffect(() => {
-    if (isResearchView && studentId && researchKey && !researchConfig && !isUnlocking) {
-      loadResearchConfig(researchKey);
+    if (isResearchView && studentId && !researchConfig && !isLoadingConfig && !configError) {
+      loadResearchConfig();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isResearchView, studentId, researchKey]);
+  }, [isResearchView, studentId]);
 
   const collapseChat = () => {
     setSeenMessageCount(messages.length);
@@ -564,7 +563,9 @@ function App() {
 
     if (!response.ok) {
       checkTurnstileRequired(response, data);
-      throw new Error(data.detail || `Request failed with status ${response.status}`);
+      const error = new Error(data.detail || `Request failed with status ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
 
     return data;
@@ -582,26 +583,19 @@ function App() {
     return data;
   };
 
-  const loadResearchConfig = async (key) => {
-    setIsUnlocking(true);
-    setUnlockError("");
+  const loadResearchConfig = async () => {
+    setIsLoadingConfig(true);
+    setConfigError("");
     try {
-      const config = await getJson("/research/config", { "X-Research-Key": key });
+      const config = await getJson("/research/config");
       setResearchConfig(config);
-      setResearchKey(key);
-      writeStored(RESEARCH_KEY_STORAGE_KEY, key);
+      setSessionTokens(config.session_tokens);
     } catch (error) {
       setResearchConfig(null);
-      setUnlockError(error.message);
+      setConfigError(error.message);
     } finally {
-      setIsUnlocking(false);
+      setIsLoadingConfig(false);
     }
-  };
-
-  const forgetResearchKey = () => {
-    setResearchKey(null);
-    setResearchConfig(null);
-    writeStored(RESEARCH_KEY_STORAGE_KEY, null);
   };
 
   const updateMessage = (messageId, updater) => {
@@ -739,17 +733,16 @@ function App() {
       };
       const messageResponse = await postJson(`/students/${studentId}/messages`, messagePayload);
       setSessionId(messageResponse.session_id);
-      const responseRecord = await postJson(
-        `/students/${studentId}/responses`,
-        {
-          message_id: messageResponse.message_id,
-          session_id: messageResponse.session_id,
-          student_message: studentMessage,
-          ...(agentOverrides ? { overrides: agentOverrides } : {}),
-        },
-        agentOverrides ? { "X-Research-Key": researchKey } : {},
-      );
+      const responseRecord = await postJson(`/students/${studentId}/responses`, {
+        message_id: messageResponse.message_id,
+        session_id: messageResponse.session_id,
+        student_message: studentMessage,
+        ...(agentOverrides ? { overrides: agentOverrides } : {}),
+      });
       setSessionId(responseRecord.session_id);
+      if (responseRecord.session_tokens) {
+        setSessionTokens(responseRecord.session_tokens);
+      }
       setMessages((current) =>
         current.map((entry) =>
           entry.id === studentTurn.id
@@ -761,6 +754,7 @@ function App() {
                   body: responseRecord.response_text,
                   model: responseRecord.llm_model || null,
                   prompt: responseRecord.llm_prompt || null,
+                  tokens: responseRecord.llm_tokens ?? null,
                   // The Model row already names the model; list only the other overrides.
                   custom: agentOverrides
                     ? describeOverrides({ ...agentOverrides, model: undefined }) || null
@@ -771,15 +765,20 @@ function App() {
         ),
       );
     } catch (error) {
+      // 429: the message went through, but this session is out of LLM tokens. Say
+      // that plainly instead of the generic fallback.
+      const isOutOfTokens = error.status === 429;
       setMessages((current) =>
         current.map((entry) =>
           entry.id === studentTurn.id
-            ? { ...entry, status: "error", error: error.message }
+            ? isOutOfTokens
+              ? { ...entry, status: "sent" }
+              : { ...entry, status: "error", error: error.message }
             : entry.id === pendingAssistantMessage.id
               ? {
                   ...entry,
-                  body: fallbackBody,
-                  error: error.message,
+                  body: isOutOfTokens ? error.message : fallbackBody,
+                  error: isOutOfTokens ? null : error.message,
                   isLoading: false,
                 }
               : entry,
@@ -851,6 +850,9 @@ function App() {
     }
     if (message.custom) {
       rows.push(["Settings", message.custom]);
+    }
+    if (message.tokens) {
+      rows.push(["Tokens", message.tokens.toLocaleString()]);
     }
     if (message.error) {
       rows.push(["Error", message.error]);
@@ -1081,10 +1083,10 @@ function App() {
                     config={researchConfig}
                     settings={agentSettings}
                     onSettingsChange={setAgentSettings}
-                    onUnlock={loadResearchConfig}
-                    isUnlocking={isUnlocking}
-                    unlockError={unlockError}
-                    onForgetKey={forgetResearchKey}
+                    sessionTokens={sessionTokens}
+                    isLoading={isLoadingConfig}
+                    loadError={configError}
+                    onRetry={loadResearchConfig}
                   />
                 </section>
               ) : null}
@@ -1158,6 +1160,7 @@ function App() {
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
                     onKeyDown={handleComposerKeyDown}
+                    maxLength={2000}
                     placeholder="Ask about your program, your bug, or what to try next."
                   />
                   <button

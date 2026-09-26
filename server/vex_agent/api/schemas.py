@@ -8,7 +8,7 @@ class MessageRequest(BaseModel):
         default=None,
         description="Optional session identifier override for testing or replaying a known session.",
     )
-    message: str = Field(default="", description="Student message text.")
+    message: str = Field(default="", max_length=2000, description="Student message text.")
     playground: str | None = Field(
         default=None,
         description="Task/playground identifier for the current activity, if already known.",
@@ -33,8 +33,9 @@ class SessionResolutionResponse(BaseModel):
 
 
 class ResearchOverrides(BaseModel):
-    """Agent settings a researcher tries from the research preview. Only honored with
-    a valid X-Research-Key header. A field left out keeps the production default."""
+    """Agent settings a researcher tries from the research preview. A field left out
+    keeps the production default. Calls made with them still count against the
+    session's token budget."""
 
     model: str | None = Field(default=None, max_length=200, description="Model id to call.")
     prompt_template: str | None = Field(
@@ -69,11 +70,12 @@ class StudentResponseRequest(BaseModel):
     )
     student_message: str | None = Field(
         default=None,
+        max_length=2000,
         description="Raw student chat message to include in the main LLM prompt.",
     )
     overrides: ResearchOverrides | None = Field(
         default=None,
-        description="Research-only agent settings; requires the X-Research-Key header.",
+        description="Research-only agent settings from the research preview.",
     )
 
 
@@ -86,6 +88,8 @@ class StudentResponseResponse(BaseModel):
     response_text: str
     llm_model: str | None = None
     llm_prompt: str | None = None
+    llm_tokens: int | None = Field(default=None, description="Tokens this reply's LLM calls spent.")
+    session_tokens: "TokenUsage | None" = None
     status: Literal["received"]
 
 
@@ -105,6 +109,13 @@ class FeedbackResponse(BaseModel):
     status: Literal["received"]
 
 
+class TokenUsage(BaseModel):
+    """This browser session's LLM token budget."""
+
+    used: int
+    limit: int
+
+
 class ResearchDefaults(BaseModel):
     model: str
     max_tokens: int
@@ -117,3 +128,7 @@ class ResearchConfigResponse(BaseModel):
     models_error: str | None = None
     prompt_template: str
     placeholders: dict[str, str]
+    session_tokens: TokenUsage
+
+
+StudentResponseResponse.model_rebuild()

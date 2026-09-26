@@ -1,8 +1,8 @@
-// The research preview's Agent tab: unlock with the research key, then pick a model
-// and edit the prompt template and sampling for this browser's replies. Settings live
-// in the parent (App.jsx), which sends them as overrides on /responses. Nothing here
-// changes what students get.
-import { useState } from "react";
+// The research preview's Agent tab: pick a model and edit the prompt template and
+// sampling for this browser's replies. Settings live in the parent (App.jsx), which
+// sends them as overrides on /responses. Nothing here changes what the production
+// agent says. Every reply counts against this browser session's LLM token budget,
+// which the server enforces.
 
 export const EMPTY_AGENT_SETTINGS = {
   model: null,
@@ -60,40 +60,17 @@ function parseNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function UnlockForm({ onUnlock, isUnlocking, error }) {
-  const [keyDraft, setKeyDraft] = useState("");
+function TokenUsage({ usage }) {
+  if (!usage) {
+    return null;
+  }
+  const left = Math.max(0, usage.limit - usage.used);
   return (
-    <form
-      className="lab-unlock"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (keyDraft.trim()) {
-          onUnlock(keyDraft.trim());
-        }
-      }}
-    >
-      <label htmlFor="research-key">Research key</label>
-      <p className="lab-hint" id="research-key-hint">
-        Unlocks model and prompt controls for this browser. Ask the project lead for the key.
-      </p>
-      <input
-        id="research-key"
-        type="password"
-        autoComplete="off"
-        value={keyDraft}
-        onChange={(event) => setKeyDraft(event.target.value)}
-        aria-describedby="research-key-hint"
-        disabled={isUnlocking}
-      />
-      <button type="submit" className="button-primary" disabled={isUnlocking || !keyDraft.trim()}>
-        {isUnlocking ? "Checking…" : "Unlock"}
-      </button>
-      {error ? (
-        <p className="lab-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </form>
+    <p className={`lab-usage ${left === 0 ? "lab-usage-spent" : ""}`}>
+      {left === 0
+        ? `This session has used all ${usage.limit.toLocaleString()} of its LLM tokens.`
+        : `${usage.used.toLocaleString()} of ${usage.limit.toLocaleString()} LLM tokens used this session.`}
+    </p>
   );
 }
 
@@ -101,15 +78,28 @@ export default function ResearchLab({
   config,
   settings,
   onSettingsChange,
-  onUnlock,
-  isUnlocking,
-  unlockError,
-  onForgetKey,
+  sessionTokens,
+  isLoading,
+  loadError,
+  onRetry,
 }) {
   if (!config) {
     return (
       <div className="lab">
-        <UnlockForm onUnlock={onUnlock} isUnlocking={isUnlocking} error={unlockError} />
+        {loadError ? (
+          <>
+            <p className="lab-error" role="alert">
+              {`Couldn't load the agent settings: ${loadError}`}
+            </p>
+            <button type="button" className="lab-link lab-retry" onClick={onRetry}>
+              Try again
+            </button>
+          </>
+        ) : (
+          <p className="lab-hint" role="status">
+            {isLoading ? "Loading the agent settings…" : ""}
+          </p>
+        )}
       </div>
     );
   }
@@ -126,6 +116,7 @@ export default function ResearchLab({
           ? "Custom settings are on. Your replies are tagged as research and kept out of student data."
           : "Production settings. Replies match what students get."}
       </p>
+      <TokenUsage usage={sessionTokens} />
 
       <div className="lab-field">
         <label htmlFor="lab-model">Model</label>
@@ -227,9 +218,6 @@ export default function ResearchLab({
           disabled={!overrides}
         >
           Reset to production
-        </button>
-        <button type="button" className="lab-link" onClick={onForgetKey}>
-          Forget research key
         </button>
       </div>
     </div>

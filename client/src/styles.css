@@ -588,11 +588,6 @@ button:disabled {
   font-weight: 700;
 }
 
-.lab-unlock {
-  display: grid;
-  gap: 0.5rem;
-}
-
 .lab-hint {
   margin: 0;
   font-size: 0.85rem;
@@ -600,8 +595,21 @@ button:disabled {
   text-wrap: pretty;
 }
 
-.lab-unlock .lab-hint {
-  margin-top: -0.35rem;
+.lab-usage {
+  margin: -0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.lab-usage-spent {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.lab-retry {
+  justify-self: start;
+  width: fit-content;
 }
 
 .lab-error {
@@ -649,7 +657,6 @@ button:disabled {
 }
 
 .lab input[type="number"],
-.lab input[type="password"],
 .lab select {
   width: 100%;
   height: 2.4rem;

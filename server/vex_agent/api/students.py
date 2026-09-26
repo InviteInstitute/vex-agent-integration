@@ -2,9 +2,8 @@ import logging
 from time import monotonic
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
-from vex_agent.api.research import require_research_key
 from vex_agent.api.schemas import (
     FeedbackRequest,
     FeedbackResponse,
@@ -14,7 +13,8 @@ from vex_agent.api.schemas import (
     StudentResponseRequest,
     StudentResponseResponse,
 )
-from vex_agent.config import DEFAULT_PLAYGROUND
+from vex_agent.api.turnstile import COOKIE_NAME
+from vex_agent.config import DEFAULT_PLAYGROUND, get_navigator_model
 from vex_agent.data.db import (
     fetch_events_from_db,
     get_latest_session_id_for_student,
@@ -30,6 +30,7 @@ from vex_agent.domain.metrics import (
     select_current_playground_segment,
 )
 from vex_agent.llm.client import DEFAULT_GENERATION_SETTINGS, GenerationSettings
+from vex_agent.services import budget
 from vex_agent.services.feedback import generate_feedback
 from vex_agent.services.logsync import sync_invite_hub_logs
 from vex_agent.services.sessions import append_session_message
@@ -161,17 +162,24 @@ def create_message(student_id: str, payload: MessageRequest) -> MessageResponse:
 def create_response(
     student_id: str,
     payload: StudentResponseRequest,
-    x_research_key: str | None = Header(default=None),
+    request: Request,
 ) -> StudentResponseResponse:
-    # Research overrides change what the model sees, so they need the research key.
-    # Replies made with them are stored as origin='research' to keep them apart from
-    # what students were actually shown.
+    # Replies made with research overrides are stored as origin='research' to keep
+    # them apart from what the production agent says.
     settings = DEFAULT_GENERATION_SETTINGS
     origin = "reactive"
     if payload.overrides is not None:
-        require_research_key(x_research_key)
         settings = GenerationSettings(**payload.overrides.model_dump())
         origin = "research"
+    # Every LLM call made for this browser counts against its session's token budget
+    # (services/budget.py). Refuse before doing any work once it's spent.
+    budget_key = budget.budget_key(request.cookies.get(COOKIE_NAME))
+    if payload.student_message:
+        try:
+            budget.check_budget(budget_key)
+        except budget.TokenBudgetExceeded as error:
+            raise HTTPException(status_code=429, detail=str(error)) from error
+    llm_tokens = 0
     response_id = uuid4()
     resolved_session_id = payload.session_id
     resolved_playground = payload.playground or DEFAULT_PLAYGROUND
@@ -275,8 +283,25 @@ def create_response(
                 prompt=llm_request["prompt"],
             )
             response_text = llm_request["response_text"]
+            llm_tokens = llm_request["tokens"]
         except Exception as error:
+            # A call that spent tokens and still failed counts too, or failing on
+            # purpose would be a free way to spend them.
+            budget.record_usage(
+                key=budget_key,
+                student_id=student_id,
+                model=settings.model or get_navigator_model(),
+                origin=origin,
+                tokens=getattr(error, "tokens", 0),
+            )
             raise HTTPException(status_code=500, detail=str(error)) from error
+        budget.record_usage(
+            key=budget_key,
+            student_id=student_id,
+            model=llm_request["model"],
+            origin=origin,
+            tokens=llm_tokens,
+        )
     elif not response_text:
         raise HTTPException(
             status_code=400,
@@ -325,6 +350,8 @@ def create_response(
         response_text=response_text,
         llm_model=llm_request["model"] if llm_request else None,
         llm_prompt=llm_request["prompt"] if llm_request else None,
+        llm_tokens=llm_tokens if llm_request else None,
+        session_tokens=budget.session_usage(budget_key),
         status="received",
     )
 

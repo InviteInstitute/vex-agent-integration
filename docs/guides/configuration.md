@@ -31,7 +31,8 @@ cp .env.example .env
 | `TRIGGER_DISABLED` | daemon | (empty) | comma-separated trigger types to detect-but-not-act-on (e.g. `inactive,explorer`), still persisted to `agent_triggers` |
 | `SESSION_SECRET` | API | insecure dev default | signs the "this browser solved Turnstile" cookie. Set a long random value in any real deployment or the cookie is forgeable |
 | `TURNSTILE_SECRET` | API | (none) | Cloudflare Turnstile server-side secret. Unset means the bot gate can't verify anyone |
-| `RESEARCH_KEY` | API | (none) | shared secret that unlocks the research preview's Agent tab (other models, prompt edits). Unset turns those tools off |
+| `LLM_SESSION_TOKEN_LIMIT` | API | `150000` | LLM tokens one browser session may spend (a session is one Turnstile cookie, 12h). Past it, replies get `429` |
+| `LLM_DAILY_TOKEN_LIMIT` | API | `3000000` | LLM tokens all browser sessions together may spend in 24 hours, a ceiling on the worst case |
 
 ## Trying Other Models And Prompts
 
@@ -39,15 +40,31 @@ The research preview lets a researcher try any model the gateway serves, edit th
 template, and change temperature, max tokens, and the reply trim, without touching
 what students get.
 
-1. Set `RESEARCH_KEY` in `.env` to a long random value and redeploy.
-2. In the chat panel, switch the footer toggle to **Research**, open the **Agent** tab,
-   and enter the key. It is remembered in that browser.
-3. Pick a model and edit the settings. They apply to your next message and are saved in
-   the browser. Each reply shows the model, the settings, and the exact prompt sent.
+1. In the chat panel, switch the footer toggle to **Research** and open the **Agent** tab.
+2. Pick a model and edit the settings. They apply to your next message and are saved in
+   the browser. Each reply shows the model, the settings, the tokens it spent, and the
+   exact prompt sent.
 
-Only replies from a browser with the key and changed settings use them. Those replies are
-stored with `origin = 'research'` in `chat.messages`, so they stay out of student data.
-Proactive check-ins always use production settings.
+Only replies from a browser with changed settings use them. Those replies are stored with
+`origin = 'research'` in `chat.messages`, so they stay out of student data. Proactive
+check-ins always use production settings.
+
+### Token budgets
+
+The Agent tab needs no key, so anyone who passes Turnstile could otherwise use the
+gateway as a free LLM. What bounds that is a token budget, enforced by the API
+(`services/budget.py`):
+
+- Each browser session (one Turnstile cookie, which lasts 12 hours) may spend
+  `LLM_SESSION_TOKEN_LIMIT` tokens. A new session needs the challenge solved again.
+- All sessions together may spend `LLM_DAILY_TOKEN_LIMIT` tokens in 24 hours.
+- Every LLM call a browser triggers counts, research settings or not, including calls
+  that fail after spending tokens. Past a limit the reply is a `429` with a plain
+  message, and the Agent tab shows how much of the session's budget is used.
+- Student messages are capped at 2,000 characters.
+
+Usage is recorded per call in `chat.llm_usage` (a hash of the cookie, never the cookie),
+which also shows who spent what on which model. Proactive check-ins are not counted.
 
 To change what students get, edit `PROMPT_TEMPLATE` (and the feedback specs) in
 `server/vex_agent/domain/context_builder.py`, or set `NAVIGATOR_MODEL`, and ship it

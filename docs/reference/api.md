@@ -26,7 +26,7 @@ is unauthenticated. `/admin/*` sits outside the gate and is meant for internal u
 | `POST` | `/v1/students/{id}/responses` | generate one grounded feedback reply |
 | `POST` | `/v1/students/{id}/responses/{response_id}/feedback` | thumbs up/down on a reply |
 | `GET`  | `/v1/students/{id}/stream` | the live Server-Sent Events stream of pushed messages |
-| `GET`  | `/v1/research/config` | models, defaults, and the live prompt template for the research preview (needs `X-Research-Key`) |
+| `GET`  | `/v1/research/config` | models, defaults, the live prompt template, and this session's token usage, for the research preview |
 | `POST` | `/admin/tick` | run one proactive tick by hand (internal) |
 
 ---
@@ -144,10 +144,16 @@ this one and the proactive daemon - run the [same pipeline](../concepts/feedback
 If the student's run is still active or they're on the wrong playground, the reply is a
 short instruction to stop or switch first, rather than feedback on stale code.
 
-**Research overrides.** With an `X-Research-Key` header matching `RESEARCH_KEY`, the
-request may carry `overrides` to try other agent settings. Every field is optional; a
-field left out keeps the production default. Without a valid key, a request with
-`overrides` gets `403`. The reply is stored with `origin = 'research'`.
+The response also carries `llm_tokens` (what this reply's LLM calls spent) and
+`session_tokens` (`{"used": …, "limit": …}` for this browser session). Once the session
+or the site is out of tokens the endpoint returns `429` with a plain `detail` message,
+before doing any work. `student_message` is capped at 2,000 characters (`422` past it).
+See [Token budgets](../guides/configuration.md#token-budgets).
+
+**Research overrides.** The request may carry `overrides` to try other agent settings.
+Every field is optional; a field left out keeps the production default. The reply is
+stored with `origin = 'research'`, and it counts against the session's token budget like
+any other.
 
 ```json title="Request with overrides"
 {
@@ -168,9 +174,8 @@ field left out keeps the production default. Without a valid key, a request with
 ## GET /v1/research/config
 
 What the research preview's Agent tab needs: the models the gateway serves, the
-production defaults, and the live prompt template with its placeholders. Requires the
-`X-Research-Key` header. Returns `404` when `RESEARCH_KEY` is unset and `403` for a
-missing or wrong key. If the gateway can't list models, `models` holds just the default
+production defaults, the live prompt template with its placeholders, and this browser
+session's token usage. If the gateway can't list models, `models` holds just the default
 and `models_error` says why.
 
 ```json title="Response"
@@ -179,7 +184,8 @@ and `models_error` says why.
   "models": ["gemma-4-31b-it", "glm-5.3", "qwen3.8-27b"],
   "models_error": null,
   "prompt_template": "You are an educational feedback assistant for VEXcode VR…",
-  "placeholders": { "task": "The playground's task description.", "…": "…" }
+  "placeholders": { "task": "The playground's task description.", "…": "…" },
+  "session_tokens": { "used": 12340, "limit": 150000 }
 }
 ```
 

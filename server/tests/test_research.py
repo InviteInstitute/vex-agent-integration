@@ -1,4 +1,4 @@
-"""Research preview: the key gate, the config endpoint, and generation overrides.
+"""Research preview: the config endpoint, the token budget gate, and overrides.
 
 No database or LLM is touched: the model list and the OpenAI client are faked, and the
 overrides are exercised through generate_main_llm_response directly."""
@@ -15,8 +15,6 @@ from vex_agent.domain.context_builder import (
 )
 from vex_agent.domain.feedback_policy import FeedbackClass
 from vex_agent.llm import client as ls
-
-KEY = "test-research-key"
 
 
 @pytest.fixture
@@ -43,23 +41,19 @@ def test_render_leaves_unknown_placeholders_and_stray_braces():
     assert rendered == 'T then {"json": 1} and {nope}'
 
 
-def test_config_reports_tools_off_without_a_key(api, monkeypatch):
-    monkeypatch.delenv("RESEARCH_KEY", raising=False)
-    monkeypatch.setattr(research_api, "get_research_key", lambda: None)
-    assert api.get("/v1/research/config").status_code == 404
+def _budget(monkeypatch, used=0):
+    """Fake the DB-backed usage lookups the routes make."""
+    from vex_agent.services import budget
+
+    monkeypatch.setattr(budget, "get_llm_tokens_for_budget_key", lambda key: used)
+    monkeypatch.setattr(budget, "get_llm_tokens_last_day", lambda: used)
 
 
-def test_config_rejects_a_wrong_key(api, monkeypatch):
-    monkeypatch.setattr(research_api, "get_research_key", lambda: KEY)
-    response = api.get("/v1/research/config", headers={"X-Research-Key": "nope"})
-    assert response.status_code == 403
-
-
-def test_config_lists_models_and_the_live_template(api, monkeypatch):
-    monkeypatch.setattr(research_api, "get_research_key", lambda: KEY)
+def test_config_lists_models_the_live_template_and_session_usage(api, monkeypatch):
+    _budget(monkeypatch, used=1234)
     monkeypatch.setattr(research_api, "get_navigator_model", lambda: "default-model")
     monkeypatch.setattr(research_api, "list_available_models", lambda: ["a", "b"])
-    body = api.get("/v1/research/config", headers={"X-Research-Key": KEY}).json()
+    body = api.get("/v1/research/config").json()
     assert body["models"] == ["default-model", "a", "b"]
     assert body["defaults"] == {
         "model": "default-model",
@@ -68,27 +62,42 @@ def test_config_lists_models_and_the_live_template(api, monkeypatch):
     }
     assert body["prompt_template"] == PROMPT_TEMPLATE
     assert set(body["placeholders"]) == set(PROMPT_PLACEHOLDERS)
+    assert body["session_tokens"] == {"used": 1234, "limit": 150_000}
 
 
 def test_config_still_answers_when_listing_models_fails(api, monkeypatch):
     def boom():
         raise RuntimeError("endpoint down")
 
-    monkeypatch.setattr(research_api, "get_research_key", lambda: KEY)
+    _budget(monkeypatch)
     monkeypatch.setattr(research_api, "get_navigator_model", lambda: "default-model")
     monkeypatch.setattr(research_api, "list_available_models", boom)
-    body = api.get("/v1/research/config", headers={"X-Research-Key": KEY}).json()
+    body = api.get("/v1/research/config").json()
     assert body["models"] == ["default-model"]
     assert "endpoint down" in body["models_error"]
 
 
-def test_overrides_on_a_response_need_the_research_key(api, monkeypatch):
-    monkeypatch.setattr(research_api, "get_research_key", lambda: KEY)
+def test_a_spent_session_is_refused_before_any_work(api, monkeypatch):
+    from vex_agent.api import students
+
+    _budget(monkeypatch, used=150_000)
+
+    def must_not_run(**kwargs):
+        raise AssertionError("the route did work after the budget was spent")
+
+    monkeypatch.setattr(students, "sync_invite_hub_logs", must_not_run)
     response = api.post(
         "/v1/students/s1/responses",
         json={"student_message": "Help", "overrides": {"model": "other"}},
     )
-    assert response.status_code == 403
+    assert response.status_code == 429
+    assert "150,000 LLM tokens" in response.json()["detail"]
+
+
+def test_an_overlong_message_is_rejected(api, monkeypatch):
+    _budget(monkeypatch)
+    response = api.post("/v1/students/s1/responses", json={"student_message": "x" * 2001})
+    assert response.status_code == 422
 
 
 def _capture_llm(monkeypatch, reply):
