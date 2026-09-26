@@ -6,7 +6,7 @@ import App from "./App.jsx";
 import { EMPTY_AGENT_SETTINGS, buildOverrides, describeOverrides } from "./ResearchLab.jsx";
 
 const CONFIG = {
-  defaults: { model: "qwen3.8-27b", max_tokens: 160, trim_to_one_sentence: true },
+  defaults: { model: "qwen3.8-27b", max_tokens: 160, trim_reply: true },
   models: ["qwen3.8-27b", "glm-5.3"],
   models_error: null,
   prompt_template: "You are an agent. Task: {task}",
@@ -32,7 +32,7 @@ describe("buildOverrides", () => {
         promptTemplate: "Be brief. {task}",
         temperature: 0.4,
         maxTokens: 300,
-        trimToOneSentence: false,
+        trimReply: false,
       },
       CONFIG,
     );
@@ -41,7 +41,7 @@ describe("buildOverrides", () => {
       prompt_template: "Be brief. {task}",
       temperature: 0.4,
       max_tokens: 300,
-      trim_to_one_sentence: false,
+      trim_reply: false,
     });
     expect(describeOverrides(overrides)).toBe(
       "glm-5.3, edited prompt, temperature 0.4, 300 max tokens, no trim",

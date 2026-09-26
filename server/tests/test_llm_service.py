@@ -65,7 +65,7 @@ def test_credentials_missing_raises(monkeypatch):
 
 
 def test_generate_main_llm_response_sanitizes_and_trims(monkeypatch):
-    # a leaked, multi-sentence model output -> cleaned + trimmed to one sentence
+    # a leaked, multi-sentence model output -> cleaned; two short sentences fit the cap
     monkeypatch.setattr(
         ls, "execute_prompt", lambda **k: 'Encouragement: "You are close. Keep going and try more."'
     )
@@ -78,6 +78,41 @@ def test_generate_main_llm_response_sanitizes_and_trims(monkeypatch):
         recent_messages=[],
         feedback_classes={FeedbackClass.REASSURE},
     )
-    text = out["response_text"]
-    assert "Encouragement" not in text and '"' not in text
-    assert text.count(".") <= 1  # trimmed to one sentence
+    assert out["response_text"] == "You are close. Keep going and try more."
+
+
+# Replies below are real ones Lumen's models gave for the Help scenario.
+
+
+def test_trim_keeps_the_hint_after_a_short_praise_sentence():
+    reply = "Your first steps are a good start. Try running the code to see where the rover stops."
+    assert ls.enforce_student_response_length(reply) == reply
+
+
+def test_trim_drops_a_second_sentence_that_would_pass_the_word_cap():
+    reply = (
+        "Hang in there, starting with a drive and turn is a good first step! "
+        "After turning right, run it and watch: where does the rover end up?"
+    )
+    assert ls.enforce_student_response_length(reply) == (
+        "Hang in there, starting with a drive and turn is a good first step!"
+    )
+
+
+def test_trim_keeps_one_slightly_long_sentence_whole():
+    reply = (
+        "You're close to getting the rover moving, so try running just the "
+        "`drive forward 200 mm` block to see how far it actually goes."
+    )
+    assert ls.enforce_student_response_length(reply) == reply
+
+
+def test_trim_shortens_a_runaway_sentence_at_a_clause_break():
+    reply = (
+        "Your robot drives forward and turns right, which is a fine start for this task, "
+        "but you will need many more blocks after that to reach the crater and rescue "
+        "the rover and bring the samples back to the lab before time runs out."
+    )
+    assert ls.enforce_student_response_length(reply) == (
+        "Your robot drives forward and turns right, which is a fine start for this task."
+    )

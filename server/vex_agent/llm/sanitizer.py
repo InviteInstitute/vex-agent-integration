@@ -24,11 +24,15 @@ _THINK_COMPLETE = re.compile(r"^\s*<think>.*?</think>\s*", re.DOTALL)
 _THINK_UNTERMINATED = re.compile(r"^\s*<think>.*", re.DOTALL)
 
 
-def _strip_thinking(text: str) -> str:
-    # Complete block first, then any unterminated prefix left over. Each is
-    # count=1 because thinking only appears at the very start of a reply.
+def strip_thinking(text: str) -> str:
+    """Drop a reasoning block from the start of a reply. Complete block first, then
+    any unterminated prefix left over (each count=1: thinking only appears at the very
+    start). Some chat templates open the <think> tag themselves, so the reply carries
+    only the closing tag: everything up to the last </think> is reasoning."""
     text = _THINK_COMPLETE.sub("", text, count=1)
     text = _THINK_UNTERMINATED.sub("", text, count=1)
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[1]
     return text
 
 
@@ -42,7 +46,7 @@ def sanitize_llm_output(text: str) -> str:
     # Drop Qwen3 thinking blocks before anything else: a truncated reasoning
     # block (max_tokens cut it mid-think) would otherwise survive as the whole
     # message and come out blank after length trimming.
-    cleaned = _strip_thinking(cleaned).strip()
+    cleaned = strip_thinking(cleaned).strip()
     if not cleaned:
         return ""
 

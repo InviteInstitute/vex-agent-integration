@@ -158,7 +158,7 @@ field left out keeps the production default. Without a valid key, a request with
     "prompt_template": "You tutor a middle schooler. Program:\n{current_program}\nThey asked: {student_message}",
     "temperature": 0.3,
     "max_tokens": 300,
-    "trim_to_one_sentence": false
+    "trim_reply": false
   }
 }
 ```
@@ -175,7 +175,7 @@ and `models_error` says why.
 
 ```json title="Response"
 {
-  "defaults": { "model": "qwen3.8-27b", "max_tokens": 160, "trim_to_one_sentence": true },
+  "defaults": { "model": "qwen3.8-27b", "max_tokens": 160, "trim_reply": true },
   "models": ["gemma-4-31b-it", "glm-5.3", "qwen3.8-27b"],
   "models_error": null,
   "prompt_template": "You are an educational feedback assistant for VEXcode VR…",

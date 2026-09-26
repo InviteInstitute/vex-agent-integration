@@ -9,7 +9,7 @@ export const EMPTY_AGENT_SETTINGS = {
   promptTemplate: null,
   temperature: null,
   maxTokens: null,
-  trimToOneSentence: true,
+  trimReply: true,
 };
 
 // The overrides payload for /responses, or null when every setting is at its
@@ -32,8 +32,8 @@ export function buildOverrides(settings, config) {
   if (settings.maxTokens !== null) {
     overrides.max_tokens = settings.maxTokens;
   }
-  if (!settings.trimToOneSentence) {
-    overrides.trim_to_one_sentence = false;
+  if (!settings.trimReply) {
+    overrides.trim_reply = false;
   }
   return Object.keys(overrides).length ? overrides : null;
 }
@@ -48,7 +48,7 @@ export function describeOverrides(overrides) {
   if (overrides.prompt_template) parts.push("edited prompt");
   if (overrides.temperature !== undefined) parts.push(`temperature ${overrides.temperature}`);
   if (overrides.max_tokens !== undefined) parts.push(`${overrides.max_tokens} max tokens`);
-  if (overrides.trim_to_one_sentence === false) parts.push("no trim");
+  if (overrides.trim_reply === false) parts.push("no trim");
   return parts.join(", ");
 }
 
@@ -175,10 +175,10 @@ export default function ResearchLab({
       <label className="lab-check">
         <input
           type="checkbox"
-          checked={settings.trimToOneSentence}
-          onChange={(event) => update({ trimToOneSentence: event.target.checked })}
+          checked={settings.trimReply}
+          onChange={(event) => update({ trimReply: event.target.checked })}
         />
-        Trim replies to one short sentence, as students get them
+        Trim replies to bite size, as students get them
       </label>
 
       <div className="lab-field lab-field-grow">

@@ -27,7 +27,8 @@ const starterMessages = [
 
 export function renderInlineMarkdown(text) {
   const parts = [];
-  const pattern = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`)/g;
+  // **bold**, __bold__, `code`, and *emphasis* (some models italicize a word).
+  const pattern = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\*[^*\s][^*]*\*)/g;
   let lastIndex = 0;
   let match;
 
@@ -41,6 +42,8 @@ export function renderInlineMarkdown(text) {
       parts.push(<strong key={`${match.index}-strong`}>{token.slice(2, -2)}</strong>);
     } else if (token.startsWith("`")) {
       parts.push(<code key={`${match.index}-code`}>{token.slice(1, -1)}</code>);
+    } else {
+      parts.push(<em key={`${match.index}-em`}>{token.slice(1, -1)}</em>);
     }
 
     lastIndex = match.index + token.length;

@@ -46,7 +46,7 @@ def get_research_config(
         defaults=ResearchDefaults(
             model=default_model,
             max_tokens=MAIN_RESPONSE_MAX_TOKENS,
-            trim_to_one_sentence=True,
+            trim_reply=True,
         ),
         models=models,
         models_error=models_error,

@@ -64,7 +64,7 @@ def test_config_lists_models_and_the_live_template(api, monkeypatch):
     assert body["defaults"] == {
         "model": "default-model",
         "max_tokens": ls.MAIN_RESPONSE_MAX_TOKENS,
-        "trim_to_one_sentence": True,
+        "trim_reply": True,
     }
     assert body["prompt_template"] == PROMPT_TEMPLATE
     assert set(body["placeholders"]) == set(PROMPT_PLACEHOLDERS)
@@ -135,7 +135,7 @@ def test_overrides_change_model_prompt_sampling_and_trim(monkeypatch):
         prompt_template="Be brief. Task: {task}. Said: {student_message}.",
         temperature=0.2,
         max_tokens=400,
-        trim_to_one_sentence=False,
+        trim_reply=False,
     )
     result = _generate(settings)
     assert calls["model"] == "glm-5.3"
