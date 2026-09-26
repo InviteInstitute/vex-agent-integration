@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/react";
 
 // App opens a Server-Sent Events connection and calls fetch on mount. jsdom has
-// neither EventSource nor a real network, so stub both — then a successful mount
+// neither EventSource nor a real network, so stub both, then a successful mount
 // exercises React 19's render + effects path end to end (not just pure helpers).
 beforeEach(() => {
   vi.stubGlobal(
