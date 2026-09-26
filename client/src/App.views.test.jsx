@@ -39,7 +39,7 @@ afterEach(() => {
 async function startChatWithCheckIn(user) {
   render(<App />);
   await user.type(screen.getByLabelText("Student ID"), "mars-042");
-  await user.click(screen.getByRole("button", { name: "Start Chat" }));
+  await user.click(screen.getByRole("button", { name: "Start chat" }));
   await screen.findByRole("region", { name: "Conversation" });
   act(() => {
     streamListeners.assistant_message({
@@ -58,7 +58,7 @@ describe("student and research views", () => {
     const user = userEvent.setup();
     await startChatWithCheckIn(user);
 
-    expect(screen.getByText("Checking in")).toBeInTheDocument();
+    expect(screen.getByText("Guide Bot is checking in")).toBeInTheDocument();
     expect(screen.queryByText("wheel_spinning")).not.toBeInTheDocument();
     expect(screen.queryByText("session-1")).not.toBeInTheDocument();
   });
@@ -80,7 +80,7 @@ describe("student and research views", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.type(screen.getByLabelText("Student ID"), "mars-042");
-    await user.click(screen.getByRole("button", { name: "Start Chat" }));
+    await user.click(screen.getByRole("button", { name: "Start chat" }));
     await screen.findByRole("region", { name: "Conversation" });
 
     await user.click(screen.getByRole("button", { name: "Collapse chat" }));
@@ -90,6 +90,6 @@ describe("student and research views", () => {
       });
     });
 
-    expect(screen.getByRole("button", { name: /Open Chat\s*1 new/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open chat\s*1 new/ })).toBeInTheDocument();
   });
 });

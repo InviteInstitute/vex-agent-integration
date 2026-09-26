@@ -1,4 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  ArrowUp,
+  CaretDown,
+  ChatCircleText,
+  Question,
+  ThumbsDown,
+  ThumbsUp,
+  WarningCircle,
+} from "@phosphor-icons/react";
 
 const defaultApiBase = import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8000/v1";
 
@@ -6,7 +15,7 @@ const starterMessages = [
   {
     id: "assistant-intro",
     role: "assistant",
-    body: "Hi! I am your coding helper. Ask a question about your project, or tap 'Help' for assistance.",
+    body: "Ask me about your project, or press Help and I'll take a look at your code.",
     canFeedback: false,
   },
 ];
@@ -126,47 +135,19 @@ function createPendingAssistantMessage() {
   };
 }
 
-function RobotIcon({ className }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
-      <rect x="4.5" y="7.5" width="15" height="11" rx="3.5" />
-      <path d="M12 7.5V4.5" />
-      <circle cx="12" cy="3.6" r="0.9" />
-      <path d="M9.4 12.4v1.2M14.6 12.4v1.2" />
-      <path d="M2.5 12v2.5M21.5 12v2.5" />
-    </svg>
-  );
-}
+const ICONS = {
+  collapse: CaretDown,
+  send: ArrowUp,
+  help: Question,
+  thumbUp: ThumbsUp,
+  thumbDown: ThumbsDown,
+  alert: WarningCircle,
+  chat: ChatCircleText,
+};
 
-function Icon({ name }) {
-  const paths = {
-    chevronDown: <path d="m6 9 6 6 6-6" />,
-    send: <path d="M5 12h13m-5-6 6 6-6 6" />,
-    help: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7" />
-        <path d="M12 17.2v.1" />
-      </>
-    ),
-    thumbUp: (
-      <path d="M7.5 10.5v9h-3v-9h3Zm0 0 3.6-6.4a1.6 1.6 0 0 1 3 .9l-.6 4h4.8a2 2 0 0 1 2 2.4l-1.2 6a2 2 0 0 1-2 1.6H7.5" />
-    ),
-    thumbDown: (
-      <path d="M16.5 13.5v-9h3v9h-3Zm0 0-3.6 6.4a1.6 1.6 0 0 1-3-.9l.6-4H5.7a2 2 0 0 1-2-2.4l1.2-6a2 2 0 0 1 2-1.6h9.6" />
-    ),
-    alert: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7.5v5.5M12 16.4v.1" />
-      </>
-    ),
-  };
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-      {paths[name]}
-    </svg>
-  );
+function Icon({ name, weight = "bold" }) {
+  const Glyph = ICONS[name];
+  return <Glyph className="icon" weight={weight} aria-hidden="true" />;
 }
 
 export function clamp(value, min, max) {
@@ -208,12 +189,15 @@ function getCursorForResizeHandle(handle) {
   return "";
 }
 
+// The panel opens in the bottom-left corner, clear of VEXcode VR's toolbar.
+const PANEL_EDGE_GAP = 24;
+
 function getDefaultPanelRect() {
-  const width = 460;
-  const height = 680;
+  const width = 440;
+  const height = Math.max(PANEL_MIN_HEIGHT, Math.min(640, window.innerHeight - 2 * PANEL_EDGE_GAP));
   return {
-    x: Math.max(12, window.innerWidth - width - 24),
-    y: 32,
+    x: PANEL_EDGE_GAP,
+    y: Math.max(12, window.innerHeight - height - PANEL_EDGE_GAP),
     width,
     height,
   };
@@ -242,6 +226,9 @@ function App() {
   const messageListRef = useRef(null);
   const messagesEndRef = useRef(null);
   const apiBase = defaultApiBase;
+  // Read by the window pointer handlers, which are bound once on mount.
+  const isStartModeRef = useRef(true);
+  isStartModeRef.current = !studentId;
   const isResearchView = view === "research";
   // The start card sizes to its content; only the chat itself is resizable.
   const canResize = Boolean(studentId);
@@ -334,7 +321,12 @@ function App() {
             12,
             window.innerWidth - current.width - 12,
           );
-          const nextY = clamp(event.clientY - interaction.offsetY, 12, window.innerHeight - 120);
+          // Before sign-in the short start card hangs from the panel's bottom
+          // edge, so keep that edge on screen instead of the (hidden) top.
+          const maxY = isStartModeRef.current
+            ? window.innerHeight - current.height - 12
+            : window.innerHeight - 120;
+          const nextY = clamp(event.clientY - interaction.offsetY, 12, maxY);
           return {
             ...current,
             x: nextX,
@@ -553,7 +545,7 @@ function App() {
       });
       updateMessage(responseId, (message) => ({
         ...message,
-        feedbackStatus: "Thanks!",
+        feedbackStatus: "Feedback sent",
         selectedThumb: thumb,
       }));
     } catch (error) {
@@ -809,11 +801,7 @@ function App() {
               aria-label={label}
               title={label}
             >
-              {pending === thumb ? (
-                <span className="spinner" aria-hidden="true" />
-              ) : (
-                <Icon name={icon} />
-              )}
+              <Icon name={icon} weight={message.selectedThumb === thumb ? "fill" : "bold"} />
             </button>
           ))}
           <button
@@ -886,66 +874,54 @@ function App() {
           onPointerLeave={handlePanelPointerLeave}
           style={{
             left: `${panelRect.x}px`,
-            top: `${panelRect.y}px`,
             width: `${panelRect.width}px`,
-            height: canResize ? `${panelRect.height}px` : undefined,
+            // The start card sizes to its form and sits where the chat's bottom
+            // edge will be, so signing in grows the panel upward in place.
+            ...(canResize
+              ? { top: `${panelRect.y}px`, height: `${panelRect.height}px` }
+              : { bottom: `${window.innerHeight - panelRect.y - panelRect.height}px` }),
             cursor: getCursorForResizeHandle(hoveredResizeHandle),
           }}
         >
           <header className="panel-header" onPointerDown={startDrag}>
-            <span className="panel-mark" aria-hidden="true">
-              <RobotIcon className="robot-icon" />
-            </span>
             <div className="panel-title">
               <h1>Guide Bot</h1>
-              {studentId ? (
-                <p>
-                  <span>{studentId}</span>
-                  <span className="panel-title-sep" aria-hidden="true" />
-                  <span>GO-Mars</span>
-                  {isResearchView ? (
-                    <>
-                      <span className="panel-title-sep" aria-hidden="true" />
-                      <span className="panel-session" title={sessionId}>
-                        {sessionId}
-                      </span>
-                    </>
-                  ) : null}
-                </p>
-              ) : (
-                <p>Your VEXcode VR coding helper</p>
-              )}
-            </div>
-            <div className="panel-actions">
-              {studentId ? (
-                <button
-                  type="button"
-                  className="help-button"
-                  onClick={handleHelp}
-                  disabled={isAgentBusy}
-                >
-                  <Icon name="help" />
-                  {pendingAction === "help" ? "Asking…" : "Help"}
-                </button>
+              {studentId ? <span className="panel-student">{studentId}</span> : null}
+              {studentId && isResearchView ? (
+                <span className="panel-session" title={sessionId}>
+                  {sessionId}
+                </span>
               ) : null}
+            </div>
+            {studentId ? (
               <button
                 type="button"
-                className="panel-icon-button"
-                onClick={collapseChat}
-                aria-label="Collapse chat"
-                title="Collapse chat"
+                className="help-button"
+                onClick={handleHelp}
+                disabled={isAgentBusy}
               >
-                <Icon name="chevronDown" />
+                <Icon name="help" />
+                {pendingAction === "help" ? "Asking…" : "Help"}
               </button>
-            </div>
+            ) : null}
+            <button
+              type="button"
+              className="panel-icon-button"
+              onClick={collapseChat}
+              aria-label="Collapse chat"
+              title="Collapse chat"
+            >
+              <Icon name="collapse" />
+            </button>
           </header>
 
           {!studentId ? (
             <div className="start">
-              <h2>Start Chat</h2>
-              <p>Enter your student ID to begin.</p>
               <form className="start-form" onSubmit={handleStudentStart}>
                 <label htmlFor="student-id">Student ID</label>
+                <p className="start-hint" id="start-hint">
+                  Enter the ID your teacher gave you to start chatting.
+                </p>
                 <input
                   id="student-id"
                   type="text"
@@ -956,14 +932,14 @@ function App() {
                   spellCheck="false"
                   disabled={pendingAction === "session"}
                   aria-invalid={Boolean(startError)}
-                  aria-describedby={startError ? "start-error" : undefined}
+                  aria-describedby={startError ? "start-hint start-error" : "start-hint"}
                 />
                 <button
                   type="submit"
                   className="button-primary"
                   disabled={pendingAction === "session" || !studentIdDraft.trim()}
                 >
-                  {pendingAction === "session" ? "Finding your session…" : "Start Chat"}
+                  {pendingAction === "session" ? "Finding your session…" : "Start chat"}
                 </button>
               </form>
               {startError ? (
@@ -978,43 +954,39 @@ function App() {
               <section className="message-list" aria-label="Conversation" ref={messageListRef}>
                 {messages.map((message) =>
                   message.role === "student" ? (
-                    <article key={message.id} className="msg msg-student">
+                    <article key={message.id} className="turn turn-student">
                       <span className="sr-only">You said: </span>
-                      <div className="bubble">{renderMessageBody(message.body)}</div>
+                      <div className="turn-body">{renderMessageBody(message.body)}</div>
                       {renderStudentStatus(message)}
                     </article>
                   ) : (
                     <article
                       key={message.id}
-                      className={`msg msg-agent ${message.proactive ? "msg-checkin" : ""}`}
+                      className={`turn turn-agent ${message.proactive ? "turn-checkin" : ""} ${
+                        message.error ? "turn-error" : ""
+                      }`}
                     >
-                      <span className="msg-avatar" aria-hidden="true">
-                        <RobotIcon className="robot-icon" />
-                      </span>
-                      <div className="msg-main">
-                        <div className="msg-author">
-                          Guide Bot
-                          {message.proactive ? (
-                            <span className="checkin-tag">
-                              {isResearchView ? "Proactive check-in" : "Checking in"}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className={`bubble ${message.error ? "bubble-error" : ""}`}>
-                          {message.isLoading ? (
-                            <span className="thinking" role="status">
-                              <span className="sr-only">Guide Bot is thinking</span>
-                              <span aria-hidden="true" />
-                              <span aria-hidden="true" />
-                              <span aria-hidden="true" />
-                            </span>
-                          ) : (
-                            renderMessageBody(message.body)
-                          )}
-                          {renderResearchDetails(message)}
-                        </div>
-                        {message.canFeedback ? renderFeedback(message) : null}
+                      {message.proactive ? (
+                        <p className="turn-label">
+                          {isResearchView ? "Proactive check-in" : "Guide Bot is checking in"}
+                        </p>
+                      ) : (
+                        <span className="sr-only">Guide Bot said: </span>
+                      )}
+                      <div className="turn-body">
+                        {message.isLoading ? (
+                          <span className="thinking" role="status">
+                            <span className="sr-only">Guide Bot is thinking</span>
+                            <span aria-hidden="true" />
+                            <span aria-hidden="true" />
+                            <span aria-hidden="true" />
+                          </span>
+                        ) : (
+                          renderMessageBody(message.body)
+                        )}
                       </div>
+                      {renderResearchDetails(message)}
+                      {message.canFeedback ? renderFeedback(message) : null}
                     </article>
                   ),
                 )}
@@ -1039,8 +1011,8 @@ function App() {
                     className="send-button"
                     disabled={pendingAction === "message" || !draft.trim()}
                   >
-                    {pendingAction === "message" ? "Sending…" : "Send"}
                     <Icon name="send" />
+                    {pendingAction === "message" ? "Sending…" : "Send"}
                   </button>
                 </div>
                 <div className="composer-foot">
@@ -1059,9 +1031,6 @@ function App() {
                       </button>
                     ))}
                   </div>
-                  <span className="composer-hint">
-                    <kbd>Enter</kbd> to send, <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line
-                  </span>
                 </div>
               </form>
               <span className="resize-grip" aria-hidden="true" />
@@ -1070,10 +1039,8 @@ function App() {
         </section>
       ) : (
         <button type="button" className="chat-launcher" onClick={() => setIsChatOpen(true)}>
-          <span className="panel-mark" aria-hidden="true">
-            <RobotIcon className="robot-icon" />
-          </span>
-          Open Chat
+          <Icon name="chat" />
+          Open chat
           {unseenReplies ? (
             <span className="launcher-badge">
               {unseenReplies} new
