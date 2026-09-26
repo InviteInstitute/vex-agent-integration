@@ -189,14 +189,14 @@ function getCursorForResizeHandle(handle) {
   return "";
 }
 
-// The panel opens in the bottom-left corner, clear of VEXcode VR's toolbar.
+// The panel opens in the bottom-right corner, clear of VEXcode VR's toolbar.
 const PANEL_EDGE_GAP = 24;
 
 function getDefaultPanelRect() {
   const width = 440;
   const height = Math.max(PANEL_MIN_HEIGHT, Math.min(640, window.innerHeight - 2 * PANEL_EDGE_GAP));
   return {
-    x: PANEL_EDGE_GAP,
+    x: Math.max(12, window.innerWidth - width - PANEL_EDGE_GAP),
     y: Math.max(12, window.innerHeight - height - PANEL_EDGE_GAP),
     width,
     height,

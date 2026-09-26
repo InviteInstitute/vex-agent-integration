@@ -24,10 +24,10 @@ does a fast-forward pull, rebuilds and rolls the stack, applies the migrations, 
 on the health check.
 
 ```bash
-make deploy      # or: scripts/deploy.sh && npm --prefix client run build
+make deploy      # or: scripts/deploy.sh && npm --prefix client ci && npm --prefix client run build
 ```
 
-`make deploy` runs the script and then rebuilds the client, since nginx serves the client
+`make deploy` runs the script and then reinstalls and rebuilds the client, since nginx serves the client
 from `client/dist` rather than the API (see [The Client Build](#the-client-build)). Under
 the hood the script does, in order:
 
@@ -59,9 +59,11 @@ done
 ## The Client Build
 
 The client is a Vite build that nginx serves from `client/dist`. `deploy.sh` does not
-rebuild it - do that when the frontend changes:
+rebuild it - do that when the frontend changes. Reinstall first so the build uses exactly
+the dependencies in `client/package-lock.json`, not whatever `node_modules` held before:
 
 ```bash
+npm --prefix client ci          # install from the lockfile
 npm --prefix client run build   # -> client/dist
 ```
 
